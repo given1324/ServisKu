@@ -1,15 +1,15 @@
 # ServisKu
 
-### Deskripsi masalah
+# Deskripsi masalah
 
 Banyak pemilik kendaraan (terutama mahasiswa dan pekerja yang menggunakan motor) sering lupa kapan terakhir kali mereka mengganti oli atau melakukan servis rutin. Kartu servis dari bengkel yang berbahan kertas sering kali hilang, sobek, atau basah. Akibatnya, perawatan kendaraan menjadi tidak teratur dan mesin cepat rusak.
 
-### Profil target pengguna
+# Profil target pengguna
 
 * **Pengguna Utama:** Pemilik kendaraan bermotor, khususnya mahasiswa, pekerja, atau anak kos.
 * **Karakteristik:** Membutuhkan catatan digital yang cepat dibuka lewat HP saat sedang berada di bengkel untuk mengecek riwayat servis sebelumnya.
 
-### Manfaat aplikasi
+# Manfaat aplikasi
 
 * Menjadi buku riwayat servis digital pribadi yang aman dan tidak akan hilang.
 * Memudahkan pengguna melihat riwayat kilometer (odometer) terakhir saat servis.
