@@ -15,7 +15,7 @@ Banyak pemilik kendaraan (terutama mahasiswa dan pekerja yang menggunakan motor)
 * Memudahkan pengguna melihat riwayat kilometer (odometer) terakhir saat servis.
 * Membantu menjaga kondisi kendaraan tetap prima karena perawatan menjadi lebih terpantau.
 
-### Daftar fitur inti (Bisa diselesaikan dalam 12 pertemuan)
+# Daftar fitur inti (Bisa diselesaikan dalam 12 pertemuan)
 
 1. **Autentikasi Pengguna:** Fitur pendaftaran dan login akun pribadi sederhana.
 2. **Tambah Riwayat Servis (CRUD):** Form sederhana untuk mencatat Tanggal, Jenis Servis (contoh: *Ganti Oli Mesin, Ganti Kampas Rem*), Kilometer (Odometer) saat ini, dan Total Biaya.
@@ -23,13 +23,13 @@ Banyak pemilik kendaraan (terutama mahasiswa dan pekerja yang menggunakan motor)
 4. **Ringkasan Biaya:** Menampilkan total pengeluaran untuk servis kendaraan pada bulan ini.
 5. **Filter Pencarian:** Fitur pencarian untuk melihat kapan terakhir kali melakukan jenis servis tertentu (misal: mencari kata "Kampas Rem").
 
-### Fitur yang tidak dikerjakan
+# Fitur yang tidak dikerjakan
 
 * Pengingat (*reminder*) otomatis melalui WhatsApp, SMS, atau Email saat waktunya servis.
 * Fitur *upload* foto nota bengkel (semua pencatatan cukup menggunakan teks dan angka saja agar sistem tidak berat).
 * Integrasi lokasi bengkel menggunakan Google Maps.
 
-### Kriteria aplikasi dinyatakan berhasil
+# Kriteria aplikasi dinyatakan berhasil
 
 * Pengguna dapat menambah, mengedit, dan menghapus catatan riwayat servis kendaraannya tanpa *error*.
 * Daftar riwayat servis tampil berurutan dan akurat sesuai data yang dimasukkan pengguna.
