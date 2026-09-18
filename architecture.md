@@ -10,7 +10,7 @@ Aplikasi ini menggunakan arsitektur Monolitik modern dengan Next.js App Router y
 - **Bahasa Pemrograman:** JavaScript
 - **Database:** SQLite (file lokal `dev.db`)
 - **ORM (Object-Relational Mapping):** Prisma
-- **Autentikasi:** NextAuth.js (v4) menggunakan sistem Kredensial (Username & Password)
+- **Autentikasi:** NextAuth.js menggunakan sistem Kredensial (Username & Password)
 - **Keamanan/Kriptografi:** `bcryptjs` untuk *hashing* password.
 
 ## 2. Alur Sistem (System Flow)
