@@ -5,8 +5,8 @@ Dokumen ini menjelaskan rancangan arsitektur, tumpukan teknologi (tech stack), s
 ## 1. Tumpukan Teknologi (Tech Stack)
 
 Aplikasi ini menggunakan arsitektur Monolitik modern dengan Next.js App Router yang menggabungkan frontend dan backend dalam satu proyek.
-- **Frontend & Backend (Framework):** Next.js (App Router, v16.3.5)
-- **UI Library:** React (v19)
+- **Frontend & Backend (Framework):** Next.js 
+- **UI Library:** React 
 - **Bahasa Pemrograman:** JavaScript
 - **Database:** SQLite (file lokal `dev.db`)
 - **ORM (Object-Relational Mapping):** Prisma
