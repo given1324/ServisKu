@@ -37,6 +37,28 @@ class ServiceHistoryNotifier extends AsyncNotifier<List<ServiceHistory>> {
       ref.invalidateSelf(); // Opsi fallback: Muat ulang data dari awal
     }
   }
+
+  // Fungsi untuk memperbarui data servis
+  Future<void> updateService(ServiceHistory service) async {
+    final repository = ref.read(serviceRepositoryProvider);
+    await repository.updateServiceHistory(service);
+    
+    if (state.hasValue) {
+      final updatedList = state.value!.map((e) => e.id == service.id ? service : e).toList();
+      state = AsyncValue.data(updatedList);
+    }
+  }
+
+  // Fungsi untuk menghapus data servis
+  Future<void> deleteService(String id) async {
+    final repository = ref.read(serviceRepositoryProvider);
+    await repository.deleteServiceHistory(id);
+    
+    if (state.hasValue) {
+      final updatedList = state.value!.where((e) => e.id != id).toList();
+      state = AsyncValue.data(updatedList);
+    }
+  }
 }
 
 // Provider untuk ServiceHistoryNotifier
