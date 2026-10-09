@@ -155,4 +155,111 @@ void main() {
     // Selesaikan pending timer agar test framework tidak mengembalikan error
     await tester.pumpAndSettle(const Duration(seconds: 5));
   });
+
+  testWidgets('shows confirmation dialog and deletes item', (WidgetTester tester) async {
+    mockRepository.mockData = [
+      ServiceHistory(
+        id: '99',
+        jenisServis: 'Servis Rem',
+        odometer: 10000,
+        totalBiaya: 50000,
+        createdAt: DateTime.now(),
+        status: 'Belum Selesai',
+      )
+    ];
+
+    await tester.pumpWidget(createTestWidget());
+    await tester.pumpAndSettle();
+
+    // Pastikan item ada
+    expect(find.text('Servis Rem'), findsOneWidget);
+
+    // Buka menu pop-up (icon more_horiz)
+    await tester.tap(find.byIcon(Icons.more_horiz));
+    await tester.pumpAndSettle();
+
+    // Tap tombol 'Hapus'
+    await tester.tap(find.text('Hapus'));
+    await tester.pumpAndSettle();
+
+    // Pastikan dialog konfirmasi muncul
+    expect(find.text('Hapus Data'), findsOneWidget);
+    expect(find.text('Apakah Anda yakin ingin menghapus data ini?'), findsOneWidget);
+
+    // Konfirmasi Hapus
+    await tester.tap(find.text('Hapus').last);
+    await tester.pumpAndSettle();
+
+    // Pastikan item hilang dan memunculkan empty state
+    expect(find.text('Servis Rem'), findsNothing);
+    expect(find.textContaining('Belum ada riwayat servis'), findsOneWidget);
+  });
+
+  testWidgets('edit mode pre-fills the form', (WidgetTester tester) async {
+    mockRepository.mockData = [
+      ServiceHistory(
+        id: '77',
+        jenisServis: 'Ganti Busi',
+        odometer: 25000,
+        totalBiaya: 35000,
+        createdAt: DateTime.now(),
+        status: 'Belum Selesai',
+      )
+    ];
+
+    await tester.pumpWidget(createTestWidget());
+    await tester.pumpAndSettle();
+
+    // Buka menu pop-up (icon more_horiz)
+    await tester.tap(find.byIcon(Icons.more_horiz));
+    await tester.pumpAndSettle();
+
+    // Tap tombol 'Edit'
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+
+    // Pastikan form terbuka dan berisi data yang benar
+    expect(find.text('Edit riwayat servis'), findsOneWidget);
+    expect(find.text('Ganti Busi'), findsOneWidget);
+    expect(find.text('25000'), findsOneWidget);
+    expect(find.text('35000'), findsOneWidget);
+  });
+
+  testWidgets('pull to refresh triggers data reload', (WidgetTester tester) async {
+    mockRepository.mockData = [
+      ServiceHistory(
+        id: '1',
+        jenisServis: 'Lama',
+        odometer: 1000,
+        totalBiaya: 10000,
+        createdAt: DateTime.now(),
+        status: 'Selesai',
+      )
+    ];
+
+    await tester.pumpWidget(createTestWidget());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lama'), findsOneWidget);
+
+    // Ganti data di backend simulasi
+    mockRepository.mockData = [
+      ServiceHistory(
+        id: '2',
+        jenisServis: 'Baru',
+        odometer: 2000,
+        totalBiaya: 20000,
+        createdAt: DateTime.now(),
+        status: 'Selesai',
+      )
+    ];
+
+    // Lakukan simulasi pull to refresh dengan mendrag ke bawah pada list
+    await tester.drag(find.text('Lama'), const Offset(0, 300));
+    await tester.pumpAndSettle();
+
+    // Pastikan data berubah
+    expect(find.text('Lama'), findsNothing);
+    expect(find.text('Baru'), findsOneWidget);
+  });
 }
