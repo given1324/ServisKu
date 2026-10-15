@@ -1,38 +1,35 @@
-# ServisKu 🏍️
+# ServisKu - Mobile Vehicle Service Tracker App 🏍️
 
-Aplikasi pencatatan dan pelacakan riwayat servis berkala kendaraan bermotor dengan dukungan **Local Data & Persistence** serta State Management berbasis **Riverpod**.
+## Deskripsi Masalah
+Banyak pemilik kendaraan bermotor (terutama mahasiswa, pekerja harian, dan pengguna komuter) kesulitan mempertahankan konsistensi dan keteraturan servis berkala pada sepeda motor mereka. Kegagalan perawatan ini sering terjadi karena mereka tidak memiliki alat pencatat riwayat servis yang praktis dan tidak adanya dorongan visual (seperti indikator status keausan suku cadang dan estimasi jadwal servis) untuk memotivasi mereka melakukan perawatan tepat waktu. Selain itu, kartu catatan servis konvensional berbahan kertas dari bengkel sering kali hilang, basah, sobek, atau lupa dibawa saat berada di bengkel. Akibatnya, pemilik tidak mengetahui riwayat jarak tempuh (*odometer*) servis terakhir, penggantian suku cadang menjadi terlambat, dan mesin kendaraan berisiko tinggi mengalami kerusakan fatal dengan biaya perbaikan yang membengkak.
 
-## ✨ Fitur Utama
-- **Local Data & Persistence**: Data riwayat servis tersimpan permanen di perangkat lokal menggunakan `shared_preferences`. Data tetap aman saat aplikasi ditutup atau browser di-refresh.
-- **CRUD Penuh**:
-  - **Create**: Tambah catatan servis baru dengan validasi form.
-  - **Read**: Tampilkan daftar riwayat servis, total biaya, dan odometer kendaraan.
-  - **Update**: Edit rincian catatan servis dan ubah status pengerjaan (Belum Selesai / Selesai).
-  - **Delete**: Hapus catatan servis dengan dialog konfirmasi.
-- **Modern UI**: Dashboard interaktif dengan kalkulasi statistik otomatis, card riwayat modern, dan pull-to-refresh.
-- **State Management**: Dibangun menggunakan `AsyncNotifier` dari `flutter_riverpod` dengan pemisahan tanggung jawab yang jelas.
+## Profil Target Pengguna
+1.Pengguna Utama: Pemilik kendaraan bermotor, khususnya mahasiswa, pekerja, atau anak kos.
 
-## 🚀 Menjalankan Aplikasi
-```powershell
-# Mengambil dependensi
-flutter pub get
+2.Karakteristik: Membutuhkan catatan digital yang cepat dibuka lewat HP saat sedang berada di bengkel untuk mengecek riwayat servis sebelumnya.
+## Manfaat Aplikasi
+1.Menjadi buku riwayat servis digital pribadi yang aman dan tidak akan hilang.
+2.Memudahkan pengguna melihat riwayat kilometer (odometer) terakhir saat servis.
+3.Membantu menjaga kondisi kendaraan tetap prima karena perawatan menjadi lebih terpantau.
 
-# Menjalankan aplikasi di Web (Chrome dengan data persisten)
-.\run_web.bat
-# atau manual:
-flutter run -d chrome --web-port=5000 --web-browser-flag="--user-data-dir=.chrome_data"
-```
+## Daftar Fitur Inti
+> *Target penyelesaian dalam 12 pertemuan.*
 
-## 🧪 Menjalankan Pengujian (Tests)
-```powershell
-flutter test
-```
-Seluruh pengujian mencakup:
-1. `test/persistence_test.dart` — Pengujian persistensi, serialisasi/deserialisasi, dan simulasi cold restart.
-2. `test/unit_test.dart` — Pengujian logika notifier dan repository.
-3. `test/widget_test.dart` — Pengujian antarmuka dan interaksi pengguna.
+1. **Manajemen Riwayat Servis (CRUD):** Fitur lengkap untuk menambah (*Create*), membaca (*Read*), mengedit (*Update*), dan menghapus (*Delete*) catatan servis kendaraan dengan validasi form (Odometer km, Jenis Servis, Total Biaya, Tanggal Servis, dan Catatan Tambahan) serta proteksi *double-submit*.
+2. **Manajemen Komponen Servis Kustom:** Fleksibilitas bagi pengguna untuk menambah, mengedit, dan menghapus komponen servis baru (misalnya kampas rem, filter udara, v-belt CVT, aki) dengan interval kilometer yang dapat ditentukan secara mandiri.
+3. **Pengelolaan Profil Kendaraan Utama:** Fitur untuk mencatat dan mengubah profil motor pengguna (Nama Motor, Nomor Plat Kendaraan, dan Tahun Pembuatan) langsung dari antarmuka *dashboard*.
+4. **Penyimpanan Data Lokal Permanen (Local Persistence):** Penggunaan arsitektur penyimpanan lokal (`shared_preferences`) yang menjamin seluruh catatan riwayat, komponen kustom, dan profil motor tersimpan permanen serta tidak hilang saat aplikasi ditutup atau perangkat di-*restart* (*offline-first*).
 
-## 📖 Dokumentasi Tugas
-Rincian penjelasan pemenuhan tugas mahasiswa dapat dilihat pada:
-- [docs/penjelasan_tugas.md](docs/penjelasan_tugas.md)
-- [Architecture.md](Architecture.md)
+## Fitur yang Tidak Dikerjakan
+1. **Integrasi Remote Push Notifications Server:** Tidak menggunakan server push notifikasi pihak ketiga (seperti Firebase Cloud Messaging / OneSignal) untuk menjaga arsitektur aplikasi tetap mandiri di perangkat lokal pengguna.
+2. **Fitur Unggah Foto Nota Bengkel:** Semua pencatatan difokuskan pada teks, tanggal, kilometer, dan angka biaya agar aplikasi tetap ringan, responsif, dan hemat ruang memori penyimpanan perangkat.
+3. **Integrasi Peta Lokasi Bengkel (Google Maps API):** Fokus pengembangan murni pada pencatatan dan estimasi perawatan kendaraan pribadi pengguna, bukan sebagai direktori pencarian lokasi bengkel.
+
+## Kriteria Aplikasi Dinyatakan Berhasil
+1.Pengguna dapat menambah, mengedit, dan menghapus catatan riwayat servis kendaraannya tanpa error.
+
+2.Daftar riwayat servis tampil berurutan dan akurat sesuai data yang dimasukkan pengguna.
+
+3.Data pengguna satu dengan pengguna lainnya terpisah dengan aman (tidak saling bercampur).
+
+4.Tampilan web ringan, tidak rumit, dan sangat nyaman dibaca lewat layar smartphone.
