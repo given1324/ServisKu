@@ -1,10 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/service_history.dart';
+import '../models/service_component.dart';
+import '../models/vehicle_info.dart';
 import '../repositories/service_repository.dart';
+
+// Provider untuk instance SharedPreferences opsional (dapat di-override di main/test)
+final sharedPreferencesProvider = Provider<SharedPreferences?>((ref) {
+  return null;
+});
 
 // Provider untuk ServiceRepository
 final serviceRepositoryProvider = Provider<ServiceRepository>((ref) {
-  return ServiceRepository();
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return ServiceRepository(prefs: prefs);
 });
 
 // AsyncNotifier untuk mengelola state data riwayat servis
@@ -19,26 +28,27 @@ class ServiceHistoryNotifier extends AsyncNotifier<List<ServiceHistory>> {
     return await repository.fetchServiceHistory();
   }
 
-  // Fungsi untuk merefresh/memuat ulang data
+  // Fungsi untuk merefresh/memuat ulang data dari local persistence
   Future<void> refreshData() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _fetchData());
   }
 
-  // Fungsi untuk menambah data servis
+  // Fungsi untuk menambah data servis (Create)
   Future<void> addService(ServiceHistory service) async {
     final repository = ref.read(serviceRepositoryProvider);
     await repository.addServiceHistory(service);
     
-    // Update local state setelah berhasil ditambahkan ke "API"
+    // Update local state secara reaktif tanpa menduplikasi data
     if (state.hasValue) {
-      state = AsyncValue.data([service, ...state.value!]);
+      final currentList = state.value!.where((e) => e.id != service.id).toList();
+      state = AsyncValue.data([service, ...currentList]);
     } else {
-      ref.invalidateSelf(); // Opsi fallback: Muat ulang data dari awal
+      ref.invalidateSelf();
     }
   }
 
-  // Fungsi untuk memperbarui data servis
+  // Fungsi untuk memperbarui data servis (Update)
   Future<void> updateService(ServiceHistory service) async {
     final repository = ref.read(serviceRepositoryProvider);
     await repository.updateServiceHistory(service);
@@ -46,10 +56,12 @@ class ServiceHistoryNotifier extends AsyncNotifier<List<ServiceHistory>> {
     if (state.hasValue) {
       final updatedList = state.value!.map((e) => e.id == service.id ? service : e).toList();
       state = AsyncValue.data(updatedList);
+    } else {
+      ref.invalidateSelf();
     }
   }
 
-  // Fungsi untuk menghapus data servis
+  // Fungsi untuk menghapus data servis (Delete)
   Future<void> deleteService(String id) async {
     final repository = ref.read(serviceRepositoryProvider);
     await repository.deleteServiceHistory(id);
@@ -57,6 +69,8 @@ class ServiceHistoryNotifier extends AsyncNotifier<List<ServiceHistory>> {
     if (state.hasValue) {
       final updatedList = state.value!.where((e) => e.id != id).toList();
       state = AsyncValue.data(updatedList);
+    } else {
+      ref.invalidateSelf();
     }
   }
 }
@@ -64,4 +78,75 @@ class ServiceHistoryNotifier extends AsyncNotifier<List<ServiceHistory>> {
 // Provider untuk ServiceHistoryNotifier
 final serviceHistoryProvider = AsyncNotifierProvider<ServiceHistoryNotifier, List<ServiceHistory>>(() {
   return ServiceHistoryNotifier();
+});
+
+// AsyncNotifier untuk profil kendaraan (motor)
+class VehicleInfoNotifier extends AsyncNotifier<VehicleInfo> {
+  @override
+  Future<VehicleInfo> build() async {
+    final repository = ref.read(serviceRepositoryProvider);
+    return await repository.fetchVehicleInfo();
+  }
+
+  // Fungsi untuk memperbarui data motor
+  Future<void> updateVehicleInfo(VehicleInfo newInfo) async {
+    final repository = ref.read(serviceRepositoryProvider);
+    await repository.saveVehicleInfo(newInfo);
+    state = AsyncValue.data(newInfo);
+  }
+}
+
+// Provider untuk VehicleInfoNotifier
+final vehicleInfoProvider = AsyncNotifierProvider<VehicleInfoNotifier, VehicleInfo>(() {
+  return VehicleInfoNotifier();
+});
+
+// AsyncNotifier untuk daftar komponen servis berkala
+class ServiceComponentsNotifier extends AsyncNotifier<List<ServiceComponent>> {
+  @override
+  Future<List<ServiceComponent>> build() async {
+    final repository = ref.read(serviceRepositoryProvider);
+    return await repository.fetchComponents();
+  }
+
+  // Tambah komponen servis baru
+  Future<void> addComponent(ServiceComponent component) async {
+    final repository = ref.read(serviceRepositoryProvider);
+    await repository.addComponent(component);
+    if (state.hasValue) {
+      final current = state.value!.where((e) => e.id != component.id).toList();
+      state = AsyncValue.data([...current, component]);
+    } else {
+      ref.invalidateSelf();
+    }
+  }
+
+  // Update komponen servis
+  Future<void> updateComponent(ServiceComponent component) async {
+    final repository = ref.read(serviceRepositoryProvider);
+    await repository.updateComponent(component);
+    if (state.hasValue) {
+      final updated = state.value!.map((e) => e.id == component.id ? component : e).toList();
+      state = AsyncValue.data(updated);
+    } else {
+      ref.invalidateSelf();
+    }
+  }
+
+  // Hapus komponen servis
+  Future<void> deleteComponent(String id) async {
+    final repository = ref.read(serviceRepositoryProvider);
+    await repository.deleteComponent(id);
+    if (state.hasValue) {
+      final updated = state.value!.where((e) => e.id != id).toList();
+      state = AsyncValue.data(updated);
+    } else {
+      ref.invalidateSelf();
+    }
+  }
+}
+
+// Provider untuk ServiceComponentsNotifier
+final serviceComponentsProvider = AsyncNotifierProvider<ServiceComponentsNotifier, List<ServiceComponent>>(() {
+  return ServiceComponentsNotifier();
 });

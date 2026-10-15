@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:serviceku/models/service_component.dart';
 import 'package:serviceku/models/service_history.dart';
+import 'package:serviceku/models/vehicle_info.dart';
 import 'package:serviceku/providers/service_provider.dart';
 import 'package:serviceku/repositories/service_repository.dart';
 
@@ -12,7 +14,7 @@ class MockServiceRepository extends ServiceRepository {
   @override
   Future<List<ServiceHistory>> fetchServiceHistory() async {
     fetchCalled = true;
-    return db;
+    return List<ServiceHistory>.from(db);
   }
 
   @override
@@ -31,6 +33,36 @@ class MockServiceRepository extends ServiceRepository {
   @override
   Future<void> deleteServiceHistory(String id) async {
     db.removeWhere((e) => e.id == id);
+  }
+
+  VehicleInfo mockVehicle = VehicleInfo.defaultVehicle;
+
+  @override
+  Future<VehicleInfo> fetchVehicleInfo() async => mockVehicle;
+
+  @override
+  Future<void> saveVehicleInfo(VehicleInfo info) async => mockVehicle = info;
+
+  List<ServiceComponent> mockComponents = List<ServiceComponent>.from(ServiceComponent.defaultPresets);
+
+  @override
+  Future<List<ServiceComponent>> fetchComponents() async => List<ServiceComponent>.from(mockComponents);
+
+  @override
+  Future<void> addComponent(ServiceComponent component) async {
+    mockComponents.removeWhere((e) => e.id == component.id);
+    mockComponents.add(component);
+  }
+
+  @override
+  Future<void> updateComponent(ServiceComponent component) async {
+    final index = mockComponents.indexWhere((e) => e.id == component.id);
+    if (index != -1) mockComponents[index] = component;
+  }
+
+  @override
+  Future<void> deleteComponent(String id) async {
+    mockComponents.removeWhere((e) => e.id == id);
   }
 }
 
@@ -142,6 +174,68 @@ void main() {
       final state = container.read(serviceHistoryProvider).value;
       expect(state, isEmpty);
       expect(mockRepo.db, isEmpty);
+    });
+  });
+
+  group('ServiceComponentsNotifier Unit Tests', () {
+    late ProviderContainer container;
+    late MockServiceRepository mockRepo;
+
+    setUp(() {
+      mockRepo = MockServiceRepository();
+      container = ProviderContainer(
+        overrides: [
+          serviceRepositoryProvider.overrideWithValue(mockRepo),
+        ],
+      );
+    });
+
+    tearDown(() {
+      container.dispose();
+    });
+
+    test('Initial state loads default presets', () async {
+      final list = await container.read(serviceComponentsProvider.future);
+      expect(list.isNotEmpty, isTrue);
+      expect(list.any((c) => c.nama == 'Oli Mesin'), isTrue);
+    });
+
+    test('addComponent adds custom component', () async {
+      await container.read(serviceComponentsProvider.future);
+      const customComp = ServiceComponent(
+        id: 'c-test-1',
+        nama: 'Rantai & Gear SSS',
+        intervalKm: 15000,
+        deskripsi: 'Pelumas berkala',
+        isCustom: true,
+      );
+
+      await container.read(serviceComponentsProvider.notifier).addComponent(customComp);
+      final state = container.read(serviceComponentsProvider).value;
+      expect(state!.any((c) => c.id == 'c-test-1'), isTrue);
+      expect(state.firstWhere((c) => c.id == 'c-test-1').nama, 'Rantai & Gear SSS');
+    });
+
+    test('updateComponent modifies existing component', () async {
+      await container.read(serviceComponentsProvider.future);
+      const updated = ServiceComponent(
+        id: 'comp_oli_mesin',
+        nama: 'Oli Mesin Full Sintetik',
+        intervalKm: 3000,
+      );
+
+      await container.read(serviceComponentsProvider.notifier).updateComponent(updated);
+      final state = container.read(serviceComponentsProvider).value;
+      final found = state!.firstWhere((c) => c.id == 'comp_oli_mesin');
+      expect(found.nama, 'Oli Mesin Full Sintetik');
+      expect(found.intervalKm, 3000);
+    });
+
+    test('deleteComponent removes component', () async {
+      await container.read(serviceComponentsProvider.future);
+      await container.read(serviceComponentsProvider.notifier).deleteComponent('comp_busi');
+      final state = container.read(serviceComponentsProvider).value;
+      expect(state!.any((c) => c.id == 'comp_busi'), isFalse);
     });
   });
 }

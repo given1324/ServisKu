@@ -6,7 +6,8 @@ import '../providers/service_provider.dart';
 
 class FormServisScreen extends ConsumerStatefulWidget {
   final ServiceHistory? existingService;
-  const FormServisScreen({super.key, this.existingService});
+  final String? initialJenisServis;
+  const FormServisScreen({super.key, this.existingService, this.initialJenisServis});
 
   @override
   ConsumerState<FormServisScreen> createState() => _FormServisScreenState();
@@ -33,7 +34,11 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
       _odometerController.text = widget.existingService!.odometer.toString();
       _totalBiayaController.text = widget.existingService!.totalBiaya.toString();
       _status = widget.existingService!.status;
-      // We don't have catatan in the model yet, but if we did, we'd load it here
+      if (widget.existingService!.catatan != null) {
+        _catatanController.text = widget.existingService!.catatan!;
+      }
+    } else if (widget.initialJenisServis != null) {
+      _jenisServisController.text = widget.initialJenisServis!;
     }
   }
 
@@ -74,12 +79,13 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
 
       final serviceToSave = ServiceHistory(
         id: widget.existingService?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        jenisServis: _jenisServisController.text,
+        jenisServis: _jenisServisController.text.trim(),
         odometer: int.parse(_odometerController.text),
         totalBiaya: int.parse(_totalBiayaController.text),
         createdAt: _selectedDate,
         completedAt: isCompletingNow ? DateTime.now() : widget.existingService?.completedAt,
         status: _status,
+        catatan: _catatanController.text.trim().isEmpty ? null : _catatanController.text.trim(),
       );
 
       if (widget.existingService == null) {
@@ -161,16 +167,15 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
+    return Material(
+      color: Colors.white,
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(24),
+        topRight: Radius.circular(24),
       ),
-      padding: const EdgeInsets.all(24.0),
-      child: Form(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
         key: _formKey,
         child: SingleChildScrollView(
           child: Column(
@@ -226,6 +231,56 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 ),
                 validator: (value) => (value == null || value.trim().isEmpty) ? 'Tidak boleh kosong' : null,
+              ),
+              const SizedBox(height: 8),
+              // Pilihan Cepat dari Komponen Servis
+              Consumer(
+                builder: (context, ref, _) {
+                  final componentsState = ref.watch(serviceComponentsProvider);
+                  final components = componentsState.value ?? [];
+                  if (components.isEmpty) return const SizedBox.shrink();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Pilihan cepat komponen:',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 6),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: components.map((comp) {
+                            final isSelected = _jenisServisController.text.trim().toLowerCase() == comp.nama.toLowerCase();
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ActionChip(
+                                label: Text(
+                                  comp.nama,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                    color: isSelected ? Colors.white : const Color(0xFF135A4B),
+                                  ),
+                                ),
+                                backgroundColor: isSelected ? const Color(0xFF135A4B) : const Color(0xFF135A4B).withValues(alpha: 0.08),
+                                side: BorderSide(
+                                  color: isSelected ? const Color(0xFF135A4B) : const Color(0xFF135A4B).withValues(alpha: 0.2),
+                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                onPressed: () {
+                                  setState(() {
+                                    _jenisServisController.text = comp.nama;
+                                  });
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 16),
               
@@ -355,7 +410,7 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
               const Text('Status Servis', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _status,
+                initialValue: _status,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -434,6 +489,7 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

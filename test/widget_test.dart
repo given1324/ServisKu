@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:serviceku/main.dart';
+import 'package:serviceku/models/service_component.dart';
 import 'package:serviceku/models/service_history.dart';
+import 'package:serviceku/models/vehicle_info.dart';
 import 'package:serviceku/providers/service_provider.dart';
 import 'package:serviceku/repositories/service_repository.dart';
 import 'package:serviceku/screens/dashboard_screen.dart';
@@ -20,7 +20,7 @@ class MockServiceRepository extends ServiceRepository {
     if (shouldThrowError) {
       throw Exception('Simulasi gagal memuat data');
     }
-    return mockData;
+    return List<ServiceHistory>.from(mockData);
   }
   
   @override
@@ -29,6 +29,49 @@ class MockServiceRepository extends ServiceRepository {
       await Future.delayed(const Duration(seconds: 5));
     }
     mockData.add(service);
+  }
+
+  @override
+  Future<void> updateServiceHistory(ServiceHistory service) async {
+    final index = mockData.indexWhere((e) => e.id == service.id);
+    if (index != -1) {
+      mockData[index] = service;
+    }
+  }
+
+  @override
+  Future<void> deleteServiceHistory(String id) async {
+    mockData.removeWhere((e) => e.id == id);
+  }
+
+  VehicleInfo mockVehicle = VehicleInfo.defaultVehicle;
+
+  @override
+  Future<VehicleInfo> fetchVehicleInfo() async => mockVehicle;
+
+  @override
+  Future<void> saveVehicleInfo(VehicleInfo info) async => mockVehicle = info;
+
+  List<ServiceComponent> mockComponents = List<ServiceComponent>.from(ServiceComponent.defaultPresets);
+
+  @override
+  Future<List<ServiceComponent>> fetchComponents() async => List<ServiceComponent>.from(mockComponents);
+
+  @override
+  Future<void> addComponent(ServiceComponent component) async {
+    mockComponents.removeWhere((e) => e.id == component.id);
+    mockComponents.add(component);
+  }
+
+  @override
+  Future<void> updateComponent(ServiceComponent component) async {
+    final index = mockComponents.indexWhere((e) => e.id == component.id);
+    if (index != -1) mockComponents[index] = component;
+  }
+
+  @override
+  Future<void> deleteComponent(String id) async {
+    mockComponents.removeWhere((e) => e.id == id);
   }
 }
 
@@ -56,6 +99,11 @@ void main() {
   });
 
   testWidgets('shows empty state when no service history has been saved', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     mockRepository.mockData = [];
     
     await tester.pumpWidget(createTestWidget());
@@ -65,6 +113,11 @@ void main() {
   });
 
   testWidgets('shows loaded data when a service history exists', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     mockRepository.mockData = [
       ServiceHistory(
         id: '1',
@@ -157,6 +210,11 @@ void main() {
   });
 
   testWidgets('shows confirmation dialog and deletes item', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     mockRepository.mockData = [
       ServiceHistory(
         id: '99',
@@ -196,6 +254,11 @@ void main() {
   });
 
   testWidgets('edit mode pre-fills the form', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     mockRepository.mockData = [
       ServiceHistory(
         id: '77',
@@ -215,17 +278,22 @@ void main() {
     await tester.pumpAndSettle();
 
     // Tap tombol 'Edit'
-    await tester.tap(find.text('Edit'));
+    await tester.tap(find.text('Edit').last);
     await tester.pumpAndSettle();
 
     // Pastikan form terbuka dan berisi data yang benar
     expect(find.text('Edit riwayat servis'), findsOneWidget);
-    expect(find.text('Ganti Busi'), findsOneWidget);
+    expect(find.text('Ganti Busi'), findsWidgets);
     expect(find.text('25000'), findsOneWidget);
     expect(find.text('35000'), findsOneWidget);
   });
 
   testWidgets('pull to refresh triggers data reload', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     mockRepository.mockData = [
       ServiceHistory(
         id: '1',
@@ -262,4 +330,76 @@ void main() {
     expect(find.text('Lama'), findsNothing);
     expect(find.text('Baru'), findsOneWidget);
   });
+
+  testWidgets('tapping Edit motor opens form and updates vehicle info', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(createTestWidget());
+    await tester.pumpAndSettle();
+
+    // Verify initial vehicle is shown
+    expect(find.text('Honda Vario 160'), findsOneWidget);
+
+    // Tap Edit button on motorcycle card
+    await tester.tap(find.text('Edit').first);
+    await tester.pumpAndSettle();
+
+    // Verify modal is open
+    expect(find.text('Edit Informasi Motor'), findsOneWidget);
+
+    // Change vehicle name
+    final nameField = find.widgetWithText(TextFormField, 'Honda Vario 160');
+    await tester.enterText(nameField, 'Yamaha NMAX 155');
+
+    // Tap Simpan Perubahan
+    await tester.tap(find.text('Simpan Perubahan'));
+    await tester.pumpAndSettle();
+
+    // Verify vehicle info updated on dashboard
+    expect(find.text('Yamaha NMAX 155'), findsWidgets);
+  });
+
+  testWidgets('adding a component displays it as a monitoring card matching oil card format', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(createTestWidget());
+    await tester.pumpAndSettle();
+
+    // Verify Pantauan Komponen section exists
+    expect(find.text('Pantauan Komponen'), findsOneWidget);
+    expect(find.text('Oli Mesin'), findsWidgets);
+
+    // Add a custom component via provider container
+    final container = ProviderScope.containerOf(tester.element(find.byType(DashboardScreen)));
+    await container.read(serviceComponentsProvider.notifier).addComponent(
+      ServiceComponent(
+        id: 'comp_test_aki',
+        nama: 'Aki Motor',
+        intervalKm: 15000,
+        deskripsi: 'Pengecekan tegangan dan penggantian aki',
+        isCustom: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify Aki Motor card appears in Pantauan Komponen with custom badge and interval
+    expect(find.text('Aki Motor'), findsWidgets);
+    expect(find.text('Kustom'), findsWidgets);
+    expect(find.text('(+15,000)'), findsWidgets);
+
+    // Verify top right card can switch through components
+    final rightChevron = find.byIcon(Icons.chevron_right);
+    if (rightChevron.evaluate().isNotEmpty) {
+      await tester.tap(rightChevron.first);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('/'), findsWidgets);
+    }
+  });
 }
+
