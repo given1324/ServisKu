@@ -26,7 +26,7 @@ Banyak pemilik kendaraan (terutama mahasiswa dan pekerja yang menggunakan motor)
 
 4.Ringkasan Biaya: Menampilkan total pengeluaran untuk servis kendaraan pada bulan ini.
 
-Filter Pencarian: Fitur pencarian untuk melihat kapan terakhir kali melakukan jenis servis tertentu (misal: mencari kata "Kampas Rem").
+5.Filter Pencarian: Fitur pencarian untuk melihat kapan terakhir kali melakukan jenis servis tertentu (misal: mencari kata "Kampas Rem").
 
 ## Fitur yang Tidak Dikerjakan
 1.Pengingat (reminder) otomatis melalui WhatsApp, SMS, atau Email saat waktunya servis.
