@@ -4,6 +4,7 @@ import '../models/service_component.dart';
 import '../models/service_history.dart';
 import '../models/vehicle_info.dart';
 import '../providers/service_provider.dart';
+import '../services/api_service.dart';
 import 'components_screen.dart';
 import 'form_motor_screen.dart';
 import 'form_service_screen.dart';
@@ -446,23 +447,44 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           // Kondisi 1: Initial loading di DashboardScreen
           loading: () => const Center(child: CircularProgressIndicator()),
           
-          // Kondisi 4: Error state
+          // Kondisi 4: Error state dengan tombol Retry
           error: (error, stackTrace) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Terjadi kesalahan saat memuat data.\n$error',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    ref.read(serviceHistoryProvider.notifier).refreshData();
-                  },
-                  child: const Text('Coba Lagi'),
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.cloud_off_rounded, size: 48, color: Colors.red.shade400),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Terjadi kesalahan saat memuat data.\n$error',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF333333)),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF135A4B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      SimulatedBackendClient.simulateError = false;
+                      ref.read(serviceHistoryProvider.notifier).refreshData();
+                    },
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Coba Lagi'),
+                  ),
+                ],
+              ),
             ),
           ),
           
