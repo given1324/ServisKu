@@ -1,7 +1,7 @@
-# ServisKu - Mobile Vehicle Service Tracker App 🏍️
+# ServisKu
 
 ## Deskripsi Masalah
-Banyak pemilik kendaraan bermotor (terutama mahasiswa, pekerja harian, dan pengguna komuter) kesulitan mempertahankan konsistensi dan keteraturan servis berkala pada sepeda motor mereka. Kegagalan perawatan ini sering terjadi karena mereka tidak memiliki alat pencatat riwayat servis yang praktis dan tidak adanya dorongan visual (seperti indikator status keausan suku cadang dan estimasi jadwal servis) untuk memotivasi mereka melakukan perawatan tepat waktu. Selain itu, kartu catatan servis konvensional berbahan kertas dari bengkel sering kali hilang, basah, sobek, atau lupa dibawa saat berada di bengkel. Akibatnya, pemilik tidak mengetahui riwayat jarak tempuh (*odometer*) servis terakhir, penggantian suku cadang menjadi terlambat, dan mesin kendaraan berisiko tinggi mengalami kerusakan fatal dengan biaya perbaikan yang membengkak.
+Banyak pemilik kendaraan (terutama mahasiswa dan pekerja yang menggunakan motor) sering lupa kapan terakhir kali mereka mengganti oli atau melakukan servis rutin. Kartu servis dari bengkel yang berbahan kertas sering kali hilang, sobek, atau basah. Akibatnya, perawatan kendaraan menjadi tidak teratur dan mesin cepat rusak.
 
 ## Profil Target Pengguna
 1.Pengguna Utama: Pemilik kendaraan bermotor, khususnya mahasiswa, pekerja, atau anak kos.
@@ -15,15 +15,17 @@ Banyak pemilik kendaraan bermotor (terutama mahasiswa, pekerja harian, dan pengg
 ## Daftar Fitur Inti
 > *Target penyelesaian dalam 12 pertemuan.*
 
-1. **Manajemen Riwayat Servis (CRUD):** Fitur lengkap untuk menambah (*Create*), membaca (*Read*), mengedit (*Update*), dan menghapus (*Delete*) catatan servis kendaraan dengan validasi form (Odometer km, Jenis Servis, Total Biaya, Tanggal Servis, dan Catatan Tambahan) serta proteksi *double-submit*.
-2. **Manajemen Komponen Servis Kustom:** Fleksibilitas bagi pengguna untuk menambah, mengedit, dan menghapus komponen servis baru (misalnya kampas rem, filter udara, v-belt CVT, aki) dengan interval kilometer yang dapat ditentukan secara mandiri.
-3. **Pengelolaan Profil Kendaraan Utama:** Fitur untuk mencatat dan mengubah profil motor pengguna (Nama Motor, Nomor Plat Kendaraan, dan Tahun Pembuatan) langsung dari antarmuka *dashboard*.
-4. **Penyimpanan Data Lokal Permanen (Local Persistence):** Penggunaan arsitektur penyimpanan lokal (`shared_preferences`) yang menjamin seluruh catatan riwayat, komponen kustom, dan profil motor tersimpan permanen serta tidak hilang saat aplikasi ditutup atau perangkat di-*restart* (*offline-first*).
+1.Autentikasi Pengguna: Fitur pendaftaran dan login akun pribadi sederhana.
+2.Tambah Riwayat Servis (CRUD): Form sederhana untuk mencatat Tanggal, Jenis Servis (contoh: Ganti Oli Mesin, Ganti Kampas Rem), Kilometer (Odometer) saat ini, dan Total Biaya.
+3.Daftar Riwayat Perawatan: Menampilkan daftar riwayat servis yang diurutkan dari tanggal paling baru ke yang paling lama.
+4.Ringkasan Biaya: Menampilkan total pengeluaran untuk servis kendaraan pada bulan ini.
+
+Filter Pencarian: Fitur pencarian untuk melihat kapan terakhir kali melakukan jenis servis tertentu (misal: mencari kata "Kampas Rem").
 
 ## Fitur yang Tidak Dikerjakan
-1. **Integrasi Remote Push Notifications Server:** Tidak menggunakan server push notifikasi pihak ketiga (seperti Firebase Cloud Messaging / OneSignal) untuk menjaga arsitektur aplikasi tetap mandiri di perangkat lokal pengguna.
-2. **Fitur Unggah Foto Nota Bengkel:** Semua pencatatan difokuskan pada teks, tanggal, kilometer, dan angka biaya agar aplikasi tetap ringan, responsif, dan hemat ruang memori penyimpanan perangkat.
-3. **Integrasi Peta Lokasi Bengkel (Google Maps API):** Fokus pengembangan murni pada pencatatan dan estimasi perawatan kendaraan pribadi pengguna, bukan sebagai direktori pencarian lokasi bengkel.
+1.Pengingat (reminder) otomatis melalui WhatsApp, SMS, atau Email saat waktunya servis.
+2.Fitur upload foto nota bengkel (semua pencatatan cukup menggunakan teks dan angka saja agar sistem tidak berat).
+3.Integrasi lokasi bengkel menggunakan Google Maps
 
 ## Kriteria Aplikasi Dinyatakan Berhasil
 1.Pengguna dapat menambah, mengedit, dan menghapus catatan riwayat servis kendaraannya tanpa error.

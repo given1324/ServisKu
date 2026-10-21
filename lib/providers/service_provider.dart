@@ -5,15 +5,23 @@ import '../models/service_component.dart';
 import '../models/vehicle_info.dart';
 import '../repositories/service_repository.dart';
 
+import '../services/api_service.dart';
+
 // Provider untuk instance SharedPreferences opsional (dapat di-override di main/test)
 final sharedPreferencesProvider = Provider<SharedPreferences?>((ref) {
   return null;
 });
 
-// Provider untuk ServiceRepository
+// Provider untuk instance ApiService (dapat di-override di test dengan mock http client)
+final apiServiceProvider = Provider<ApiService>((ref) {
+  return ApiService();
+});
+
+// Provider untuk ServiceRepository yang menghubungkan Notifier ke Backend API & local cache
 final serviceRepositoryProvider = Provider<ServiceRepository>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
-  return ServiceRepository(prefs: prefs);
+  final api = ref.watch(apiServiceProvider);
+  return ServiceRepository(prefs: prefs, apiService: api);
 });
 
 // AsyncNotifier untuk mengelola state data riwayat servis

@@ -1,59 +1,28 @@
-# Architecture Documentation — ServisKu
-
-## Overview
-ServisKu menerapkan arsitektur berorientasi lapisan (*layered architecture*) yang memisahkan tanggung jawab antara antarmuka (Presentation Layer), manajemen state (State Management Layer), abstraksi data (Repository Layer), dan penyimpanan persisten lokal (Data/Persistence Layer).
-
-```
-┌────────────────────────────────────────────────────────┐
-│                   PRESENTATION LAYER                   │
-│   - DashboardScreen (Overview, summary, list riwayat)  │
-│   - FormServisScreen (Input form, validasi, edit)      │
-└─────────────────────────┬──────────────────────────────┘
-                          │
-                          ▼
-┌────────────────────────────────────────────────────────┐
-│               STATE MANAGEMENT LAYER                   │
-│   - Riverpod AsyncNotifier (ServiceHistoryNotifier)    │
-│   - serviceHistoryProvider (UI reactive binding)       │
-└─────────────────────────┬──────────────────────────────┘
-                          │
-                          ▼
-┌────────────────────────────────────────────────────────┐
-│                   REPOSITORY LAYER                     │
-│   - ServiceRepository (Kontrak & orkestrasi data)      │
-│   - JSON Serialization / Deserialization               │
-└─────────────────────────┬──────────────────────────────┘
-                          │
-                          ▼
-┌────────────────────────────────────────────────────────┐
-│               LOCAL PERSISTENCE LAYER                  │
-│   - SharedPreferences ('servisku_service_history_v1')  │
-│   - Device / Browser local file storage                │
-└────────────────────────────────────────────────────────┘
-```
-
-## Layer Responsibilities
-
-### 1. Presentation Layer (`lib/screens/`)
-- `dashboard_screen.dart`: Menampilkan data riwayat servis, kalkulasi total pengeluaran, total servis, odometer terbaru, banner jadwal komponen, dan profil motor utama dengan aksi edit cepat.
-- `form_service_screen.dart`: Menangani input data servis baru dan pengeditan data riwayat servis. Memiliki pilihan cepat (quick chips) dari komponen terdaftar, validasi input, dan proteksi *double-tap submit*.
-- `form_motor_screen.dart`: Modal bottom sheet untuk mengedit profil motor utama (nama/tipe motor, plat nomor, tahun pembuatan).
-- `components_screen.dart`: Manajemen komponen servis berkala (Oli Mesin, Oli Gardan, Busi, Filter Udara, Kampas Rem, CVT, Coolant, serta komponen kustom baru), memantau interval km terhadap odometer saat ini, dan tombol langsung 'Catat Servis'.
-
-### 2. State Management Layer (`lib/providers/`)
-- Menggunakan `flutter_riverpod` dengan pendekatan `AsyncNotifier`.
-- `serviceHistoryProvider` (`ServiceHistoryNotifier`): Mengelola daftar riwayat servis kendaraan (CRUD).
-- `vehicleInfoProvider` (`VehicleInfoNotifier`): Mengelola state profil motor utama secara reaktif.
-- `serviceComponentsProvider` (`ServiceComponentsNotifier`): Mengelola daftar komponen servis berkala (CRUD komponen kustom dan status interval).
-
-### 3. Repository Layer (`lib/repositories/`)
-- `service_repository.dart`: Bertindak sebagai Single Source of Truth bagi Notifier.
-- Melakukan serialisasi entitas `ServiceHistory`, `VehicleInfo`, dan `ServiceComponent` ke format JSON dan deserialisasi dari JSON.
-- Mengisolasi implementasi penyimpanan lokal dari logika bisnis dan UI.
-
-### 4. Persistence Layer (`shared_preferences`)
-- Menggunakan `shared_preferences` untuk menyimpan list serialized JSON pada disk lokal perangkat / browser:
-  - `servisku_service_history_v1`: Catatan riwayat servis kendaraan
-  - `servisku_vehicle_info_v1`: Informasi profil motor utama
-  - `servisku_service_components_v1`: Daftar komponen servis berkala & kustom
-- Mendukung multi-platform: Android, iOS, Windows desktop, Linux, macOS, dan Web tanpa dependensi native FFI tambahan.
+# Arsitektur Sistem - Serviceku (Web Application)
+Dokumen ini menjelaskan rancangan arsitektur, tumpukan teknologi (tech stack), struktur proyek, dan skema data untuk aplikasi web Serviceku.
+## 1. Tumpukan Teknologi (Tech Stack)
+Aplikasi ini menggunakan arsitektur Monolitik modern dengan Next.js App Router yang menggabungkan frontend dan backend dalam satu proyek.
+- **Frontend & Backend (Framework):** Next.js (App Router, v16.3.5)
+- **UI Library:** React (v19)
+- **Bahasa Pemrograman:** JavaScript
+- **Database:** SQLite (file lokal `dev.db`)
+- **ORM (Object-Relational Mapping):** Prisma
+- **Autentikasi:** NextAuth.js (v4) menggunakan sistem Kredensial (Username & Password)
+- **Keamanan/Kriptografi:** `bcryptjs` untuk *hashing* password.
+## 2. Alur Sistem (System Flow)
+- **Autentikasi:** Aplikasi menggunakan NextAuth untuk mengelola sesi pengguna. Saat login, sistem akan mencocokkan *username* dan *password* (yang di-hash dengan `bcryptjs`) dari database SQLite melalui Prisma. Sesi disimpan secara aman menggunakan mekanisme yang disediakan oleh NextAuth.
+- **Manajemen Data (CRUD):** Semua operasi pembuatan, pembacaan, pengeditan, dan penghapusan data servis kendaraan (Service Records) dilakukan melalui **Server Actions** (`app/actions.js`). Hal ini memungkinkan frontend memanggil fungsi backend secara langsung dan aman tanpa harus membuat API route terpisah.
+- **Akses Relasional:** Setiap catatan servis (Service Record) diikat langsung ke pengguna yang sedang login (melalui `userId`), memastikan bahwa pengguna hanya bisa melihat dan mengelola catatan servis milik mereka sendiri.
+## 3. Skema Database (Relasional - SQLite via Prisma)
+Sistem menggunakan dua tabel/model utama yang direlasikan:
+### A. Tabel/Model `User`
+Menyimpan kredensial dan profil dasar pengguna.
+- `id` (String, Primary Key / UUID)
+- `username` (String, Unique) - Digunakan untuk identitas login
+- `password` (String) - Disimpan dalam bentuk hash `bcrypt`
+- `createdAt` (DateTime) - Waktu akun dibuat
+### B. Tabel/Model `ServiceRecord`
+Menyimpan riwayat servis kendaraan yang dilakukan oleh pengguna.
+- `id` (String, Primary Key / UUID)
+- `userId` (String, Foreign Key -> `User`)
+- `date` (DateTime) - Tanggal servis dilakukan

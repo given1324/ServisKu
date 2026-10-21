@@ -3,12 +3,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/service_history.dart';
 import '../models/service_component.dart';
 import '../models/vehicle_info.dart';
+import '../services/api_service.dart';
 
 class ServiceRepository {
   static const String storageKey = 'servisku_service_history_v1';
   final SharedPreferences? prefs;
+  final ApiService? apiService;
 
-  ServiceRepository({this.prefs});
+  ServiceRepository({this.prefs, this.apiService});
 
   Future<SharedPreferences> _getPrefs() async {
     final p = prefs ?? await SharedPreferences.getInstance();
@@ -16,11 +18,8 @@ class ServiceRepository {
     return p;
   }
 
-  // Read (Read from local persistence)
-  Future<List<ServiceHistory>> fetchServiceHistory() async {
-    final prefs = await _getPrefs();
-    final jsonString = prefs.getString(storageKey);
-    
+  Future<List<ServiceHistory>> _fetchLocalList(SharedPreferences p) async {
+    final jsonString = p.getString(storageKey);
     if (jsonString == null || jsonString.trim().isEmpty) {
       return [];
     }
@@ -30,42 +29,88 @@ class ServiceRepository {
       final list = decoded
           .map((item) => ServiceHistory.fromMap(item as Map<String, dynamic>))
           .toList();
-      // Urutkan dari riwayat terbaru (createdAt descending)
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return list;
-    } catch (e) {
-      // Jika terjadi kegagalan parsing, kembalikan list kosong
+    } catch (_) {
       return [];
     }
   }
 
-  // Create (Save new record to local persistence)
-  Future<void> addServiceHistory(ServiceHistory service) async {
-    final prefs = await _getPrefs();
-    final currentList = await fetchServiceHistory();
-    // Tambahkan di awal list atau replace jika ID sudah ada
-    currentList.removeWhere((item) => item.id == service.id);
-    currentList.insert(0, service);
-    await _saveList(prefs, currentList);
+  // Read: Loading dari Backend API (jika apiService tersedia) atau dari local persistence
+  Future<List<ServiceHistory>> fetchServiceHistory() async {
+    if (apiService != null) {
+      final list = await apiService!.fetchServices();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      if (prefs != null) {
+        await _saveList(prefs!, list);
+      }
+      return list;
+    }
+
+    final p = await _getPrefs();
+    return _fetchLocalList(p);
   }
 
-  // Update (Update existing record in local persistence)
+  // Create: Penyimpanan data ke Backend & update storage lokal
+  Future<void> addServiceHistory(ServiceHistory service) async {
+    if (apiService != null) {
+      await apiService!.createService(service);
+      if (prefs != null) {
+        final currentList = await _fetchLocalList(prefs!);
+        currentList.removeWhere((item) => item.id == service.id);
+        currentList.insert(0, service);
+        await _saveList(prefs!, currentList);
+      }
+      return;
+    }
+
+    final p = await _getPrefs();
+    final currentList = await _fetchLocalList(p);
+    currentList.removeWhere((item) => item.id == service.id);
+    currentList.insert(0, service);
+    await _saveList(p, currentList);
+  }
+
+  // Update: Perbarui data di Backend & storage lokal
   Future<void> updateServiceHistory(ServiceHistory service) async {
-    final prefs = await _getPrefs();
-    final currentList = await fetchServiceHistory();
+    if (apiService != null) {
+      await apiService!.updateService(service);
+      if (prefs != null) {
+        final currentList = await _fetchLocalList(prefs!);
+        final index = currentList.indexWhere((item) => item.id == service.id);
+        if (index != -1) {
+          currentList[index] = service;
+          await _saveList(prefs!, currentList);
+        }
+      }
+      return;
+    }
+
+    final p = await _getPrefs();
+    final currentList = await _fetchLocalList(p);
     final index = currentList.indexWhere((item) => item.id == service.id);
     if (index != -1) {
       currentList[index] = service;
-      await _saveList(prefs, currentList);
+      await _saveList(p, currentList);
     }
   }
 
-  // Delete (Remove record from local persistence)
+  // Delete: Hapus data di Backend & storage lokal
   Future<void> deleteServiceHistory(String id) async {
-    final prefs = await _getPrefs();
-    final currentList = await fetchServiceHistory();
+    if (apiService != null) {
+      await apiService!.deleteService(id);
+      if (prefs != null) {
+        final currentList = await _fetchLocalList(prefs!);
+        currentList.removeWhere((item) => item.id == id);
+        await _saveList(prefs!, currentList);
+      }
+      return;
+    }
+
+    final p = await _getPrefs();
+    final currentList = await _fetchLocalList(p);
     currentList.removeWhere((item) => item.id == id);
-    await _saveList(prefs, currentList);
+    await _saveList(p, currentList);
   }
 
   // Helper untuk menyimpan list ke SharedPreferences
