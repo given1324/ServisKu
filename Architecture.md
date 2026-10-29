@@ -175,24 +175,6 @@ serviceku/
 
 ---
 
-## 6. Strategi Pengujian Otomatis (Testing Strategy)
-
-Aplikasi memiliki piramida pengujian lengkap yang memverifikasi seluruh komponen arsitektur:
-
-1. **API & Model Unit Tests ([test/api_unit_test.dart](file:///c:/Users/USER/serviceku/test/api_unit_test.dart)):**
-   - Model Valid: Deserialisasi JSON valid $\rightarrow$ `isValid == true`.
-   - Model Invalid: Skema cacat (field kosong / angka negatif) $\rightarrow$ `FormatException`.
-   - API Sukses: MockClient HTTP 200/201 $\rightarrow$ berhasil memuat dan menyimpan data.
-   - Data Kosong: MockClient HTTP 200 `[]` $\rightarrow$ mengembalikan list kosong.
-   - HTTP Gagal: MockClient HTTP 500/404 $\rightarrow$ melempar `ApiException`.
-   - JSON Rusak: Respons cacat/HTML $\rightarrow$ melempar `FormatException`.
-2. **State Management Tests ([test/unit_test.dart](file:///c:/Users/USER/serviceku/test/unit_test.dart)):**
-   - Memvalidasi transisi state pada `ServiceHistoryNotifier` dan `ServiceComponentsNotifier`.
-3. **UI & Widget Tests ([test/widget_test.dart](file:///c:/Users/USER/serviceku/test/widget_test.dart)):**
-   - Memvalidasi 5 kondisi tampilan: initial loading, empty state, loaded data, error state + retry button, validasi form, serta submit loading.
-4. **Cold Restart Persistence Tests ([test/persistence_test.dart](file:///c:/Users/USER/serviceku/test/persistence_test.dart)):**
-   - Memvalidasi bahwa seluruh data catatan servis, profil kendaraan, dan suku cadang kustom tetap utuh saat aplikasi ditutup lalu dibuka kembali.
-
 **Hasil Eksekusi Keseluruhan:**
 ```powershell
 flutter test
