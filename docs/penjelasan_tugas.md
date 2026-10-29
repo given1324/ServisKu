@@ -193,3 +193,59 @@ Untuk mendemonstrasikan tugas ini secara langsung:
    - Konfirmasi dialog hapus.
    - Kartu terhapus dari tampilan.
    - Refresh kembali browser / buka ulang aplikasi: data yang telah dihapus terbukti tidak muncul kembali.
+
+
+---
+
+## 6. Tugas Pertemuan 7: MVP Lengkap & 3 Advanced Feature
+
+### A. Ringkasan Implementasi MVP Pertemuan 7
+
+Seluruh alur utama MVP telah diselesaikan dengan integrasi 3 fitur tingkat lanjut (*advanced features*), penanganan kondisi (*loading*, *empty*, *error*, *permission handling*), serta penyesuaian estetika *Dark Theme* sesuai referensi visual:
+
+| Fitur / Kebutuhan | Deskripsi Implementasi | Lokasi Kode |
+|---|---|---|
+| **1. Navigasi Penuh** | Bottom Navigation Bar 5 Tab (Kendaraan, Riwayat, Bengkel, Notifikasi, Akun) dengan badge jumlah notifikasi unread. | [main_navigation_screen.dart](file:///c:/Users/USER/serviceku/lib/screens/main_navigation_screen.dart) |
+| **2. Form & Validasi** | Form validasi ketat: email valid & password min 6 karakter, form servis (nama, odo angka, biaya angka), form motor, dan form kustom komponen. | [login_screen.dart](file:///c:/Users/USER/serviceku/lib/screens/login_screen.dart), [form_service_screen.dart](file:///c:/Users/USER/serviceku/lib/screens/form_service_screen.dart) |
+| **3. Penyimpanan Data** | Penyimpanan sesi login, preferensi izin, profil motor, komponen kustom, riwayat servis, dan notifikasi ke Local Storage (`SharedPreferences`). | [service_repository.dart](file:///c:/Users/USER/serviceku/lib/repositories/service_repository.dart), [service_provider.dart](file:///c:/Users/USER/serviceku/lib/providers/service_provider.dart) |
+| **4. Advanced Feature 1: Autentikasi** | Sistem login pengguna, register, demo guest login, persistensi sesi akun, dan logout. | [login_screen.dart](file:///c:/Users/USER/serviceku/lib/screens/login_screen.dart), [user_model.dart](file:///c:/Users/USER/serviceku/lib/models/user_model.dart) |
+| **5. Advanced Feature 2: Notifikasi Pengingat** | Peringatan servis berkala saat batas odometer tercapai, simulasi trigger, dialog izin notifikasi (Izinkan / Tolak / Batal), filter notifikasi. | [notification_screen.dart](file:///c:/Users/USER/serviceku/lib/screens/notification_screen.dart), [service_notification.dart](file:///c:/Users/USER/serviceku/lib/models/service_notification.dart) |
+| **6. Advanced Feature 3: Lokasi Bengkel Google Maps** | Pencari bengkel terdekat (AHASS, Yamaha, Umum, Tambal Ban) berbasis GPS & Haversine formula, radar visualizer, izin lokasi, dan direct link rute Google Maps. | [workshop_map_screen.dart](file:///c:/Users/USER/serviceku/lib/screens/workshop_map_screen.dart), [workshop_model.dart](file:///c:/Users/USER/serviceku/lib/models/workshop_model.dart) |
+| **7. Penanganan Kondisi Lengkap** | Penanganan status: *Loading* (indikator progres), *Empty* (tampilan ramah pengguna saat data kosong), *Error* (penanganan kegagalan & tombol Coba Lagi), *Permission & Cancellation* (penanganan izin GPS & Notif saat ditolak/dibatalkan). | Seluruh layar UI |
+| **8. Desain Sesuai Referensi** | Tampilan *Dark Theme* (`#0F1216`), kartu Odometer besar (`10.000 km`), siluet motor spotlight, banner status "Semua komponen dalam kondisi baik", segmented tab ("Komponen" | "Perawatan"), dan kartu "Sehat". | [dashboard_screen.dart](file:///c:/Users/USER/serviceku/lib/screens/dashboard_screen.dart) |
+
+---
+
+### B. Penjelasan 3 Advanced Feature & Manfaatnya Bagi Pengguna
+
+#### 1. Autentikasi Pengguna (Login & Manajemen Akun)
+- **Cara Kerja:** Pengguna dapat masuk menggunakan akun terdaftar atau menggunakan akun demo instan. Sesi login tersimpan secara persisten di local storage sehingga pengguna tidak perlu login berulang kali saat membuka aplikasi.
+- **Manfaat bagi Pengguna:**
+  1. **Personalisasi Data:** Setiap data riwayat perawatan dan profil kendaraan terikat dengan akun pengendara.
+  2. **Keamanan & Privasi:** Mencegah catatan pengeluaran servis dan spesifikasi kendaraan diakses orang lain tanpa izin.
+  3. **Fleksibilitas Akses Tamu:** Pengguna baru tetap dapat langsung mencoba fitur MVP melalui tombol "Masuk sebagai Tamu (Mode Demo)".
+
+#### 2. Notifikasi & Pengingat Servis Berkala
+- **Cara Kerja:** Sistem memantau selisih jarak tempuh odometer terhadap batas interval masing-masing komponen (seperti Oli Mesin 2.000 km, Busi 6.000 km). Saat kilometer mendekati batas atau terlampaui (*overdue*), aplikasi membunyikan/menampilkan peringatan notifikasi berlevel urgensi (Aman, Perhatian, Darurat).
+- **Manfaat bagi Pengguna:**
+  1. **Mencegah Kerusakan Mesin Fatal:** Pengendara terhindar dari kehabisan oli mesin atau mogok di jalan akibat komponen aus yang lupa diganti.
+  2. **Efisiensi Biaya Perawatan:** Servis tepat waktu menjaga konsumsi bahan bakar tetap hemat dan memperpanjang usia motor.
+  3. **Kontrol Izin Transparan:** Pengguna memiliki kendali penuh untuk mengizinkan (*grant*) atau menolak (*deny*) izin notifikasi melalui dialog izin yang ramah.
+
+#### 3. Lokasi GPS & Pencari Bengkel Google Maps Terdekat
+- **Cara Kerja:** Aplikasi meminta izin akses lokasi (GPS) untuk mendeteksi koordinat pengguna (Latitude & Longitude). Jarak ke berbagai bengkel dihitung secara akurat menggunakan rumus matematika *Haversine* dan diurutkan dari yang terdekat. Dilengkapi tombol direct link untuk membuka titik lokasi dan navigasi rute di Google Maps.
+- **Manfaat bagi Pengguna:**
+  1. **Solusi Cepat Kondisi Darurat:** Sangat membantu saat pengendara mengalami ban bocor atau motor mogok di perjalanan untuk menemukan tukang tambal ban atau bengkel terdekat.
+  2. **Pilihan Bengkel Spesifik:** Pengguna dapat menyaring bengkel resmi (AHASS Honda, Yamaha) atau bengkel umum yang buka 24 jam.
+  3. **Navigasi Rute Langsung:** Sekali klik, aplikasi langsung membuka Google Maps Navigation tanpa perlu mengetik ulang alamat.
+
+---
+
+### C. Penanganan Kasus Izin & Pembatalan (Permission & Cancellation Handling)
+
+1. **Izin Notifikasi:**
+   - Pengguna dapat memilih **Izinkan**, **Tolak**, atau **Batal/Nanti**.
+   - Jika ditolak, aplikasi tidak crash; sistem beralih ke mode manual dan menampilkan banner informatif bahwa pengingat otomatis non-aktif.
+2. **Izin Lokasi (GPS):**
+   - Jika pengguna menolak atau membatalkan izin lokasi, aplikasi secara cerdas beralih ke lokasi acuan default (Gading Serpong / Tangerang) sehingga pengguna tetap dapat melihat daftar bengkel dan tautan peta.
+   - Disediakan tombol **Coba Lagi** untuk meminta izin kembali kapan pun pengguna menginginkannya.
