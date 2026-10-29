@@ -1,4 +1,4 @@
-# ServisKu - Buku Riwayat Perawatan Motor Digital
+# ServisKu
 
 ## Deskripsi Masalah
 Banyak pemilik kendaraan bermotor, khususnya sepeda motor yang digunakan untuk mobilitas sehari-hari, sering kali lupa kapan terakhir kali mereka melakukan perawatan rutin, seperti mengganti oli mesin, kampas rem, busi, maupun servis transmisi berkala. 
