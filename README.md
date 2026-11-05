@@ -80,7 +80,6 @@ flutter run -d chrome
 # atau untuk Android:
 flutter run
 ```
-*(Konfigurasi koneksi Cloud **Supabase PostgreSQL & Auth** sudah terpasang secara langsung di `lib/services/supabase_service.dart`, sehingga Reviewer dapat langsung menjalankan aplikasi tanpa perlu menyiapkan file `.env` tambahan).*
 
 ---
 
