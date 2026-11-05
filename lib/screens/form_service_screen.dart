@@ -354,6 +354,7 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
               TextFormField(
                 controller: _totalBiayaController,
                 keyboardType: TextInputType.number,
+                scrollPadding: const EdgeInsets.only(bottom: 140),
                 decoration: InputDecoration(
                   prefixText: 'Rp  ',
                   prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 14),
@@ -390,6 +391,7 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
               TextFormField(
                 controller: _catatanController,
                 maxLines: 3,
+                scrollPadding: const EdgeInsets.only(bottom: 160),
                 decoration: InputDecoration(
                   hintText: 'Oli Motul 10W-40',
                   hintStyle: TextStyle(color: Colors.grey.shade400),

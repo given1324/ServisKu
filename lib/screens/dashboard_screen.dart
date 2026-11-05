@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import 'components_screen.dart';
 import 'form_motor_screen.dart';
 import 'form_service_screen.dart';
+import 'history_screen.dart';
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -19,6 +20,14 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int _topCardIndex = 0;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   IconData _getComponentIcon(String nama) {
     final l = nama.toLowerCase();
@@ -66,17 +75,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     required int currentOdo,
     double? width,
   }) {
-    final relatedServices = historyList.where(
-      (s) => s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
+    final completedServices = historyList.where(
+      (s) =>
+          s.status == 'Selesai' &&
+          s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
     ).toList();
 
-    final int lastServicedKm = relatedServices.isNotEmpty
-        ? relatedServices.first.odometer
+    final hasPendingService = historyList.any(
+      (s) =>
+          s.status != 'Selesai' &&
+          s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
+    );
+
+    final int lastServicedKm = completedServices.isNotEmpty
+        ? completedServices.first.odometer
         : 0;
 
     final int nextServiceKm = lastServicedKm > 0
         ? (lastServicedKm + comp.intervalKm)
-        : (currentOdo > 0 ? (currentOdo + comp.intervalKm) : comp.intervalKm);
+        : comp.intervalKm;
 
     final int kmRemaining = nextServiceKm > currentOdo
         ? (nextServiceKm - currentOdo)
@@ -91,7 +108,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final Color statusColor = isOverdue
         ? Colors.red
-        : (isWarning ? Colors.orange : const Color(0xFFD68A36));
+        : (hasPendingService
+            ? Colors.orange
+            : (isWarning ? Colors.orange : const Color(0xFFD68A36)));
 
     final IconData iconData = _getComponentIcon(comp.nama);
     final Color iconColor = _getComponentColor(comp.nama);
@@ -166,6 +185,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text('Servis!', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.red)),
+                      )
+                    else if (hasPendingService)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('Belum Selesai', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.orange)),
                       ),
                   ],
                 ),
@@ -258,17 +286,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final safeIndex = _topCardIndex.clamp(0, displayComponents.length - 1);
     final comp = displayComponents[safeIndex];
 
-    final relatedServices = historyList.where(
-      (s) => s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
+    final completedServices = historyList.where(
+      (s) =>
+          s.status == 'Selesai' &&
+          s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
     ).toList();
 
-    final int lastServicedKm = relatedServices.isNotEmpty
-        ? relatedServices.first.odometer
+    final int lastServicedKm = completedServices.isNotEmpty
+        ? completedServices.first.odometer
         : 0;
 
     final int nextServiceKm = lastServicedKm > 0
         ? (lastServicedKm + comp.intervalKm)
-        : (currentOdo > 0 ? (currentOdo + comp.intervalKm) : comp.intervalKm);
+        : comp.intervalKm;
 
     final int kmRemaining = nextServiceKm > currentOdo
         ? (nextServiceKm - currentOdo)
@@ -495,11 +525,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             int lastOdometer = data.isEmpty ? 0 : data.map((e) => e.odometer).reduce((a, b) => a > b ? a : b);
 
             // Daftar komponen terurut (Oli, kemudian Komponen Kustom yang baru ditambah, kemudian preset lainnya)
-            final displayComponents = [
+            final allDisplayComponents = [
               ...components.where((c) => c.nama.toLowerCase().contains('oli')),
               ...components.where((c) => c.isCustom && !c.nama.toLowerCase().contains('oli')),
               ...components.where((c) => !c.isCustom && !c.nama.toLowerCase().contains('oli')),
             ];
+
+            final queryLower = _searchQuery.toLowerCase();
+
+            // Filter komponen jika kata kunci pencarian cocok dengan nama/deskripsi komponen
+            final matchedComponents = queryLower.isEmpty
+                ? allDisplayComponents
+                : allDisplayComponents.where((c) {
+                    return c.nama.toLowerCase().contains(queryLower) ||
+                        c.deskripsi.toLowerCase().contains(queryLower);
+                  }).toList();
+            final displayComponents = matchedComponents.isNotEmpty
+                ? matchedComponents
+                : allDisplayComponents;
+
+            // Filter daftar riwayat servis berdasarkan kata kunci pencarian
+            final filteredData = queryLower.isEmpty
+                ? data
+                : data.where((service) {
+                    final matchJenis = service.jenisServis.toLowerCase().contains(queryLower);
+                    final matchCatatan = (service.catatan ?? '').toLowerCase().contains(queryLower);
+                    final matchStatus = service.status.toLowerCase().contains(queryLower);
+                    final matchOdo = service.odometer.toString().contains(queryLower);
+                    return matchJenis || matchCatatan || matchStatus || matchOdo;
+                  }).toList();
             
             return RefreshIndicator(
               onRefresh: () async {
@@ -679,9 +733,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                       const SizedBox(height: 16),
                                       const Text('Total pengeluaran', style: TextStyle(color: Colors.grey, fontSize: 12)),
                                       const SizedBox(height: 4),
-                                      Text(
-                                        currencyFormatter.format(totalPengeluaran), 
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          currencyFormatter.format(totalPengeluaran),
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                        ),
                                       ),
                                       const SizedBox(height: 12),
                                       const Divider(height: 1, color: Color(0xFFEEEEEE)),
@@ -851,9 +909,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   ),
                                 ],
                               ),
-                              const Text(
-                                'Lihat semua',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF135A4B)),
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  child: Text(
+                                    'Lihat semua',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF135A4B)),
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -867,10 +937,28 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               border: Border.all(color: Colors.grey.shade200),
                             ),
                             child: TextField(
+                              controller: _searchController,
+                              onChanged: (value) {
+                                setState(() {
+                                  _searchQuery = value.trim();
+                                });
+                              },
                               decoration: InputDecoration(
                                 hintText: 'Cari jenis servis, misalnya kampas rem...',
                                 hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
                                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                                suffixIcon: _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.close, color: Colors.grey, size: 18),
+                                        tooltip: 'Hapus pencarian',
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() {
+                                            _searchQuery = '';
+                                          });
+                                        },
+                                      )
+                                    : null,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
                                   borderSide: BorderSide.none,
@@ -886,15 +974,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   
                   // Service List
-                  data.isEmpty
+                  filteredData.isEmpty
                       ? SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.all(32.0),
                             child: Center(
-                              child: Text(
-                                'Belum ada riwayat servis.\nSilakan tambah data baru.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _searchQuery.isNotEmpty
+                                        ? 'Tidak ditemukan riwayat servis untuk "$_searchQuery".'
+                                        : 'Belum ada riwayat servis.\nSilakan tambah data baru.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                                  ),
+                                  if (_searchQuery.isNotEmpty) ...[
+                                    const SizedBox(height: 12),
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() {
+                                          _searchQuery = '';
+                                        });
+                                      },
+                                      icon: const Icon(Icons.refresh, size: 16, color: Color(0xFF135A4B)),
+                                      label: const Text(
+                                        'Reset Pencarian',
+                                        style: TextStyle(color: Color(0xFF135A4B), fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ),
@@ -904,7 +1015,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           sliver: SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (context, index) {
-                                final service = data[index];
+                                final service = filteredData[index];
                                 
                                 // Determine icon and colors based on type
                                 IconData iconData = Icons.build_circle_outlined;
@@ -984,7 +1095,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     trailing: PopupMenuButton<String>(
                                       icon: const Icon(Icons.more_horiz, color: Colors.grey),
                                       onSelected: (value) {
-                                        if (value == 'edit') {
+                                        if (value == 'complete') {
+                                          final completedService = service.copyWith(
+                                            status: 'Selesai',
+                                            completedAt: DateTime.now(),
+                                          );
+                                          ref.read(serviceHistoryProvider.notifier).updateService(completedService);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              backgroundColor: const Color(0xFF135A4B),
+                                              content: Text(
+                                                'Servis "${service.jenisServis}" ditandai Selesai! Jadwal komponen diperbarui.',
+                                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                              ),
+                                            ),
+                                          );
+                                        } else if (value == 'edit') {
                                           showModalBottomSheet(
                                             context: context,
                                             isScrollControlled: true,
@@ -1009,6 +1135,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                                   onPressed: () {
                                                     Navigator.pop(context);
                                                     ref.read(serviceHistoryProvider.notifier).deleteService(service.id);
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(
+                                                        backgroundColor: Colors.redAccent,
+                                                        content: Text(
+                                                          'Catatan servis "${service.jenisServis}" berhasil dihapus.',
+                                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                                        ),
+                                                      ),
+                                                    );
                                                   },
                                                   child: const Text('Hapus', style: TextStyle(color: Colors.red)),
                                                 ),
@@ -1018,6 +1153,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         }
                                       },
                                       itemBuilder: (context) => [
+                                        if (service.status != 'Selesai')
+                                          const PopupMenuItem(
+                                            value: 'complete',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.check_circle_outline, color: Color(0xFF135A4B), size: 18),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  'Tandai Selesai',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF135A4B),
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         const PopupMenuItem(
                                           value: 'edit',
                                           child: Text('Edit'),
@@ -1031,7 +1183,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   ),
                                 );
                               },
-                              childCount: data.length,
+                              childCount: filteredData.length,
                             ),
                           ),
                         ),
@@ -1047,6 +1199,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        tooltip: 'Tambah Catatan Servis Baru',
         backgroundColor: const Color(0xFF135A4B),
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

@@ -339,13 +339,39 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.jenisServis,
-                      style: const TextStyle(
-                        color: Color(0xFF0F172A),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            item.jenisServis,
+                            style: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: item.status == 'Selesai'
+                                ? const Color(0xFFE4F2EF)
+                                : Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            item.status,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: item.status == 'Selesai'
+                                  ? const Color(0xFF135A4B)
+                                  : Colors.orange.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -356,11 +382,27 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 ),
               ),
               PopupMenuButton<String>(
+                tooltip: 'Opsi Catatan Servis',
                 icon: const Icon(Icons.more_horiz, color: Color(0xFF64748B)),
                 color: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onSelected: (val) {
-                  if (val == 'edit') {
+                  if (val == 'complete') {
+                    final completed = item.copyWith(
+                      status: 'Selesai',
+                      completedAt: DateTime.now(),
+                    );
+                    ref.read(serviceHistoryProvider.notifier).updateService(completed);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: const Color(0xFF135A4B),
+                        content: Text(
+                          'Servis "${item.jenisServis}" ditandai Selesai! Jadwal komponen diperbarui.',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    );
+                  } else if (val == 'edit') {
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
@@ -375,6 +417,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   }
                 },
                 itemBuilder: (ctx) => [
+                  if (item.status != 'Selesai')
+                    const PopupMenuItem(
+                      value: 'complete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle_outline, color: Color(0xFF135A4B), size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Tandai Selesai',
+                            style: TextStyle(color: Color(0xFF135A4B), fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
                   const PopupMenuItem(
                     value: 'edit',
                     child: Row(

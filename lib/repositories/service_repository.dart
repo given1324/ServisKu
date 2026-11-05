@@ -43,6 +43,7 @@ class ServiceRepository {
       final List<dynamic> decoded = json.decode(jsonString) as List<dynamic>;
       final list = decoded
           .map((item) => ServiceHistory.fromMap(item as Map<String, dynamic>))
+          .where((item) => !item.jenisServis.toLowerCase().contains('mock'))
           .toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return list;
@@ -288,7 +289,7 @@ class ServiceRepository {
               id: item['id']?.toString() ?? '',
               nama: item['nama']?.toString() ?? '',
               intervalKm: (item['interval_km'] as num?)?.toInt() ?? 2000,
-              deskripsi: item['deskripsi']?.toString(),
+              deskripsi: item['deskripsi']?.toString() ?? '',
               isCustom: item['is_custom'] == true,
             );
           }).toList();

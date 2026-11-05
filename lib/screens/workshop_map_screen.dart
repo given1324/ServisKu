@@ -21,11 +21,11 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
   }
 
   void _showLocationPermissionDialog() {
-    ref.read(locationProvider.notifier).requestPermission();
+    final manualLocationController = TextEditingController();
 
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -33,37 +33,130 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
           children: [
             Icon(Icons.location_on_rounded, color: Color(0xFF135A4B)),
             SizedBox(width: 10),
-            Text('Izin Akses Lokasi (GPS)', style: TextStyle(color: Color(0xFF1E293B), fontSize: 18, fontWeight: FontWeight.bold)),
+            Expanded(
+              child: Text(
+                'Atur & Deteksi Lokasi (GPS)',
+                style: TextStyle(color: Color(0xFF1E293B), fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'ServisKu membutuhkan akses lokasi Anda untuk menampilkan bengkel resmi (AHASS, Yamaha) dan bengkel umum terdekat secara presisi di Google Maps.',
-              style: TextStyle(color: Color(0xFF475569), fontSize: 13, height: 1.4),
-            ),
-            SizedBox(height: 12),
-            Text(
-              '• Menghitung jarak tempuh akurat (km)\n• Membuka navigasi rute ke bengkel\n• Siaga tambal ban dan bengkel 24 jam',
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Deteksi posisi Anda secara otomatis via GPS/Jaringan atau ketik nama Kota / Kecamatan Anda agar daftar bengkel sesuai dengan lokasi Anda saat ini:',
+                style: TextStyle(color: Color(0xFF475569), fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Cari Kota / Kecamatan Manual:',
+                style: TextStyle(color: Color(0xFF1E293B), fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: manualLocationController,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Misal: Samarinda, Surabaya, Bandung...',
+                        hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+                        prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF135A4B)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF135A4B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () async {
+                      final query = manualLocationController.text.trim();
+                      if (query.isEmpty) return;
+                      Navigator.pop(ctx);
+                      await ref.read(locationProvider.notifier).searchAndSetLocation(query);
+                      if (mounted) {
+                        final updatedLoc = ref.read(locationProvider).locationName;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: const Color(0xFF135A4B),
+                            content: Text(
+                              'Lokasi berhasil diatur ke: $updatedLoc',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Cari', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Pilihan Cepat Kota:',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  'Balikpapan',
+                  'Samarinda',
+                  'Surabaya',
+                  'Jakarta',
+                  'Bandung',
+                  'Malang',
+                  'Yogyakarta',
+                ].map((city) {
+                  return ActionChip(
+                    label: Text(
+                      city,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF135A4B), fontWeight: FontWeight.w600),
+                    ),
+                    backgroundColor: const Color(0xFFE4F2EF),
+                    side: BorderSide.none,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await ref.read(locationProvider.notifier).searchAndSetLocation(city);
+                      if (mounted) {
+                        final updatedLoc = ref.read(locationProvider).locationName;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: const Color(0xFF135A4B),
+                            content: Text(
+                              'Lokasi diatur ke: $updatedLoc',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '• Menghitung jarak tempuh akurat (km)\n• Menyesuaikan bengkel terdekat di kota Anda\n• Membuka navigasi rute Google Maps',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+              ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              ref.read(locationProvider.notifier).cancelPermission();
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Permintaan lokasi dibatalkan. Menampilkan bengkel berdasarkan area default.'),
-                ),
-              );
-            },
-            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
-          ),
           TextButton(
             onPressed: () {
               ref.read(locationProvider.notifier).denyPermission();
@@ -71,33 +164,35 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   backgroundColor: Colors.redAccent,
-                  content: Text('Izin lokasi ditolak. Gunakan tombol Coba Lagi untuk mengaktifkan.'),
+                  content: Text('Izin lokasi ditolak. Gunakan tombol lokasi untuk mengaktifkan kembali.'),
                 ),
               );
             },
-            child: const Text('Tolak', style: TextStyle(color: Colors.redAccent)),
+            child: const Text('Tolak', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF135A4B),
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
-              ref.read(locationProvider.notifier).grantPermission(
-                    lat: -6.2550,
-                    lng: 106.6200,
-                    locName: 'Gading Serpong, Tangerang Selatan (GPS Aktif)',
-                  );
+            icon: const Icon(Icons.my_location, size: 16),
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  backgroundColor: Color(0xFF135A4B),
-                  content: Text('Lokasi GPS berhasil diaktifkan! Menampilkan bengkel terdekat.',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              );
+              await ref.read(locationProvider.notifier).detectRealLocation(useSavedIfAvailable: false);
+              if (mounted) {
+                final updatedLoc = ref.read(locationProvider).locationName;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: const Color(0xFF135A4B),
+                    content: Text(
+                      'Lokasi GPS terdeteksi: $updatedLoc',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                );
+              }
             },
-            child: const Text('Izinkan Lokasi'),
+            label: const Text('Deteksi Otomatis (GPS)', style: TextStyle(fontSize: 12)),
           ),
         ],
       ),
@@ -415,19 +510,41 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
                   child: _buildMapPin('24 Jam', accentColor),
                 ),
 
-                // Info overlay
+                // Info overlay (Dapat diklik untuk mengganti lokasi)
                 Positioned(
                   bottom: 8,
                   left: 12,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.near_me, color: Color(0xFF64748B), size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        locationState.locationName,
-                        style: const TextStyle(color: Color(0xFF475569), fontSize: 11, fontWeight: FontWeight.w500),
+                  right: 12,
+                  child: InkWell(
+                    onTap: _showLocationPermissionDialog,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.near_me, color: Color(0xFF135A4B), size: 14),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              locationState.locationName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Color(0xFF1E293B), fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'Ubah',
+                            style: TextStyle(color: Color(0xFF135A4B), fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],

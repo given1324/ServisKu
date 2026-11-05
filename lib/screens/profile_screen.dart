@@ -264,6 +264,10 @@ class ProfileScreen extends ConsumerWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Anda telah berhasil keluar dari akun.')),
                       );
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (route) => false,
+                      );
                     }
                   },
                 ),
