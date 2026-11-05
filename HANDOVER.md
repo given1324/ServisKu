@@ -18,7 +18,6 @@ flutter run -d chrome
 # atau untuk Android:
 flutter run
 ```
-> **Catatan Konfigurasi Cloud**: Kredensial koneksi *Supabase URL* dan *Publishable Anon Key* sudah dikonfigurasi di dalam [`lib/services/supabase_service.dart`](lib/services/supabase_service.dart), sehingga Reviewer dapat langsung menjalankan dan menguji aplikasi tanpa perlu membuat konfigurasi `.env` manual.
 
 ---
 
