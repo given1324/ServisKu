@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/service_history.dart';
@@ -10,6 +12,7 @@ import '../models/service_notification.dart';
 import '../models/workshop_model.dart';
 import '../repositories/service_repository.dart';
 import '../services/api_service.dart';
+import '../services/gps_helper.dart';
 import '../services/supabase_service.dart';
 
 // Provider untuk instance SharedPreferences opsional (dapat di-override di main/test)
@@ -53,12 +56,23 @@ class ServiceHistoryNotifier extends AsyncNotifier<List<ServiceHistory>> {
     await repository.addServiceHistory(service);
     
     // Update local state secara reaktif tanpa menduplikasi data
+    List<ServiceHistory> updatedHistory;
     if (state.hasValue) {
       final currentList = state.value!.where((e) => e.id != service.id).toList();
-      state = AsyncValue.data([service, ...currentList]);
+      updatedHistory = [service, ...currentList];
+      state = AsyncValue.data(updatedHistory);
     } else {
       ref.invalidateSelf();
+      updatedHistory = [service];
     }
+
+    // Evaluasi dan kirim notifikasi pengingat servis secara otomatis
+    final components = ref.read(serviceComponentsProvider).value ?? ServiceComponent.defaultPresets;
+    await ref.read(notificationProvider.notifier).evaluateServiceReminders(
+          updatedHistory,
+          components,
+          newlyAddedService: service,
+        );
   }
 
   // Fungsi untuk memperbarui data servis (Update)
@@ -66,12 +80,20 @@ class ServiceHistoryNotifier extends AsyncNotifier<List<ServiceHistory>> {
     final repository = ref.read(serviceRepositoryProvider);
     await repository.updateServiceHistory(service);
     
+    List<ServiceHistory> updatedHistory;
     if (state.hasValue) {
-      final updatedList = state.value!.map((e) => e.id == service.id ? service : e).toList();
-      state = AsyncValue.data(updatedList);
+      updatedHistory = state.value!.map((e) => e.id == service.id ? service : e).toList();
+      state = AsyncValue.data(updatedHistory);
     } else {
       ref.invalidateSelf();
+      updatedHistory = [service];
     }
+
+    final components = ref.read(serviceComponentsProvider).value ?? ServiceComponent.defaultPresets;
+    await ref.read(notificationProvider.notifier).evaluateServiceReminders(
+          updatedHistory,
+          components,
+        );
   }
 
   // Fungsi untuk menghapus data servis (Delete)
@@ -197,7 +219,13 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     final jsonStr = prefs.getString(authStorageKey);
     if (jsonStr != null && jsonStr.isNotEmpty) {
       try {
-        return UserModel.fromJson(jsonStr);
+        final user = UserModel.fromJson(jsonStr);
+        // Abaikan dan bersihkan jika merupakan sisa sesi akun dummy
+        if (user.email == 'budi.rider@gmail.com' || user.id == 'usr-001') {
+          await prefs.remove(authStorageKey);
+          return null;
+        }
+        return user;
       } catch (_) {}
     }
 
@@ -207,19 +235,19 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
 
   Future<void> _ensureDefaultRegisteredUsers(SharedPreferences prefs) async {
     final raw = prefs.getString(registeredUsersStorageKey);
-    if (raw == null || raw.isEmpty) {
-      final defaultList = [
-        {
-          'id': 'usr-001',
-          'nama': 'Budi Rider',
-          'email': 'budi.rider@gmail.com',
-          'password': 'password123',
-          'createdAt': DateTime.now().subtract(const Duration(days: 90)).toIso8601String(),
-          'isGuest': false,
-        }
-      ];
-      await prefs.setString(registeredUsersStorageKey, json.encode(defaultList));
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final List<dynamic> decoded = json.decode(raw);
+        // Hapus akun dummy budi.rider jika masih ada di cache lokal
+        final filtered = decoded.where((e) {
+          final email = (e as Map)['email']?.toString().toLowerCase() ?? '';
+          return email != 'budi.rider@gmail.com' && e['id'] != 'usr-001';
+        }).toList();
+        await prefs.setString(registeredUsersStorageKey, json.encode(filtered));
+        return;
+      } catch (_) {}
     }
+    await prefs.setString(registeredUsersStorageKey, json.encode([]));
   }
 
   /// Mendapatkan daftar akun yang sudah terdaftar
@@ -236,13 +264,40 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     return [];
   }
 
+  /// Menyinkronkan akun Supabase yang berhasil login ke daftar akun lokal browser
+  Future<void> _syncLocalRegisteredUser(
+    SharedPreferences prefs,
+    UserModel user,
+    String password,
+  ) async {
+    final users = await getRegisteredUsers();
+    final idx = users.indexWhere(
+      (u) => (u['email'] as String? ?? '').toLowerCase() == user.email.toLowerCase(),
+    );
+    final userMap = {
+      'id': user.id,
+      'nama': user.nama,
+      'email': user.email.toLowerCase(),
+      'password': password,
+      'createdAt': user.createdAt.toIso8601String(),
+      'isGuest': false,
+    };
+    if (idx == -1) {
+      users.add(userMap);
+    } else {
+      users[idx] = userMap;
+    }
+    await prefs.setString(registeredUsersStorageKey, json.encode(users));
+  }
+
   /// Login dengan Email dan Password (Terhubung ke Supabase Auth dengan fallback lokal)
   Future<void> login(String email, String password) async {
-    state = const AsyncValue.loading();
     final trimmedEmail = email.trim().toLowerCase();
     final trimmedPassword = password.trim();
 
+    // 1. Coba login melalui Supabase Auth
     final sbClient = SupabaseService.client;
+    String? supabaseErrorMsg;
     if (sbClient != null) {
       try {
         final res = await sbClient.auth.signInWithPassword(
@@ -260,50 +315,81 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
           );
           final prefs = ref.watch(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
           await prefs.setString(authStorageKey, user.toJson());
+          await _syncLocalRegisteredUser(prefs, user, trimmedPassword);
           state = AsyncValue.data(user);
           return;
         }
       } on AuthException catch (e) {
-        state = const AsyncValue.data(null);
-        throw Exception(e.message);
-      } catch (_) {
-        // Fallback jika belum terhubung ke jaringan
+        debugPrint('⚠️ [Supabase Auth] AuthException: ${e.message} (code: ${e.code})');
+        final msgLower = e.message.toLowerCase();
+        // Supabase hanya mengembalikan 'Email not confirmed' jika email & password VALID
+        // namun fitur Confirm Email di dashboard Supabase masih aktif dan belum diklik.
+        if (msgLower.contains('email not confirmed') || e.code == 'email_not_confirmed') {
+          final user = UserModel(
+            id: 'sb-${trimmedEmail.hashCode.abs()}',
+            nama: trimmedEmail.split('@').first.toUpperCase(),
+            email: trimmedEmail,
+            createdAt: DateTime.now(),
+            isGuest: false,
+          );
+          final prefs = ref.watch(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
+          await prefs.setString(authStorageKey, user.toJson());
+          await _syncLocalRegisteredUser(prefs, user, trimmedPassword);
+          state = AsyncValue.data(user);
+          return;
+        }
+        supabaseErrorMsg = e.message;
+      } catch (e) {
+        debugPrint('⚠️ [Supabase Auth] Login via Supabase: $e. Memeriksa database akun lokal...');
       }
     }
 
-    // Fallback verifikasi akun lokal
-    await Future.delayed(const Duration(milliseconds: 300));
+    // 2. Fallback verifikasi akun lokal
+    await Future.delayed(const Duration(milliseconds: 200));
     final users = await getRegisteredUsers();
     final matchedIndex = users.indexWhere(
       (u) => (u['email'] as String? ?? '').toLowerCase() == trimmedEmail,
     );
 
     if (matchedIndex == -1) {
-      state = const AsyncValue.data(null);
-      throw Exception('Akun belum terdaftar! Silakan lakukan pendaftaran akun terlebih dahulu.');
+      if (supabaseErrorMsg != null && supabaseErrorMsg.toLowerCase().contains('invalid login credentials')) {
+        throw Exception(
+          'Email atau kata sandi salah, atau akun ($trimmedEmail) belum terdaftar di Supabase.',
+        );
+      }
+      throw Exception('Akun ($trimmedEmail) belum terdaftar! Silakan lakukan pendaftaran akun terlebih dahulu.');
     }
 
     final userMap = users[matchedIndex];
     if (userMap['password'] != trimmedPassword) {
-      state = const AsyncValue.data(null);
       throw Exception('Kata sandi salah. Silakan periksa kembali kata sandi Anda.');
     }
 
     final user = UserModel.fromMap(userMap);
     final prefs = ref.watch(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
     await prefs.setString(authStorageKey, user.toJson());
+
+    // Coba daftarkan otomatis ke Supabase di latar belakang agar akun tersinkron
+    if (sbClient != null) {
+      try {
+        await sbClient.auth.signUp(
+          email: trimmedEmail,
+          password: trimmedPassword,
+          data: {'nama': user.nama},
+        );
+      } catch (_) {}
+    }
+
     state = AsyncValue.data(user);
   }
 
   /// Login via Gmail / Google
   Future<void> loginWithGoogle(String email) async {
-    state = const AsyncValue.loading();
     final trimmedEmail = email.trim().toLowerCase();
 
     final sbClient = SupabaseService.client;
     if (sbClient != null) {
       try {
-        // Coba login jika akun terdaftar di Supabase
         final users = await getRegisteredUsers();
         final matched = users.where((u) => (u['email'] as String? ?? '').toLowerCase() == trimmedEmail);
         if (matched.isNotEmpty && matched.first['password'] != null) {
@@ -329,14 +415,13 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
       } catch (_) {}
     }
 
-    await Future.delayed(const Duration(milliseconds: 350));
+    await Future.delayed(const Duration(milliseconds: 200));
     final users = await getRegisteredUsers();
     final matchedIndex = users.indexWhere(
       (u) => (u['email'] as String? ?? '').toLowerCase() == trimmedEmail,
     );
 
     if (matchedIndex == -1) {
-      state = const AsyncValue.data(null);
       throw Exception(
         'Akun Gmail ($trimmedEmail) belum terdaftar di ServisKu! Hanya akun yang sudah terdaftar yang dapat masuk. Silakan registrasi terlebih dahulu.',
       );
@@ -351,10 +436,21 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
 
   /// Registrasi Akun Baru (Daftarkan ke Supabase Auth & lokal)
   Future<void> register(String nama, String email, String password) async {
-    state = const AsyncValue.loading();
     final trimmedEmail = email.trim().toLowerCase();
     final trimmedPassword = password.trim();
     final trimmedNama = nama.trim();
+
+    final prefs = ref.watch(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
+    final users = await getRegisteredUsers();
+    final exists = users.any(
+      (u) => (u['email'] as String? ?? '').toLowerCase() == trimmedEmail,
+    );
+
+    if (exists) {
+      throw Exception('Email ($trimmedEmail) sudah terdaftar. Silakan langsung masuk (login).');
+    }
+
+    String generatedId = 'usr-${DateTime.now().millisecondsSinceEpoch}';
 
     final sbClient = SupabaseService.client;
     if (sbClient != null) {
@@ -366,52 +462,15 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
         );
         final sbUser = res.user;
         if (sbUser != null) {
-          final user = UserModel(
-            id: sbUser.id,
-            nama: trimmedNama,
-            email: sbUser.email ?? trimmedEmail,
-            createdAt: DateTime.tryParse(sbUser.createdAt) ?? DateTime.now(),
-            isGuest: false,
-          );
-          final prefs = ref.watch(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
-          await prefs.setString(authStorageKey, user.toJson());
-
-          final users = await getRegisteredUsers();
-          users.removeWhere((u) => (u['email'] as String? ?? '').toLowerCase() == trimmedEmail);
-          users.add({
-            'id': sbUser.id,
-            'nama': trimmedNama,
-            'email': trimmedEmail,
-            'password': trimmedPassword,
-            'createdAt': DateTime.now().toIso8601String(),
-            'isGuest': false,
-          });
-          await prefs.setString(registeredUsersStorageKey, json.encode(users));
-
-          state = AsyncValue.data(user);
-          return;
+          generatedId = sbUser.id;
         }
-      } on AuthException catch (e) {
-        state = const AsyncValue.data(null);
-        throw Exception(e.message);
-      } catch (_) {
-        // Fallback lokal
+      } catch (e) {
+        debugPrint('⚠️ [Supabase Auth] SignUp cloud info: $e');
       }
     }
 
-    await Future.delayed(const Duration(milliseconds: 350));
-    final users = await getRegisteredUsers();
-    final exists = users.any(
-      (u) => (u['email'] as String? ?? '').toLowerCase() == trimmedEmail,
-    );
-
-    if (exists) {
-      state = const AsyncValue.data(null);
-      throw Exception('Email ini sudah terdaftar. Silakan langsung masuk (login).');
-    }
-
     final newUserMap = {
-      'id': 'usr-${DateTime.now().millisecondsSinceEpoch}',
+      'id': generatedId,
       'nama': trimmedNama,
       'email': trimmedEmail,
       'password': trimmedPassword,
@@ -419,7 +478,6 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
       'isGuest': false,
     };
 
-    final prefs = ref.watch(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
     users.add(newUserMap);
     await prefs.setString(registeredUsersStorageKey, json.encode(users));
 
@@ -481,29 +539,8 @@ class NotificationNotifier extends AsyncNotifier<List<ServiceNotification>> {
       } catch (_) {}
     }
 
-    // Default preset notifications
-    return [
-      ServiceNotification(
-        id: 'notif-init-1',
-        title: 'Pengingat Ganti Oli Mesin',
-        message: 'Odometer motor Anda saat ini 10.000 km. Waktunya cek atau ganti oli mesin.',
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        isRead: false,
-        type: 'reminder',
-        componentName: 'Oli Mesin',
-        isUrgent: true,
-      ),
-      ServiceNotification(
-        id: 'notif-init-2',
-        title: 'Servis Berkala Siap',
-        message: 'Busi dan Filter Udara dalam kondisi baik. Estimasi servis berikutnya pada 14.000 km.',
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-        isRead: true,
-        type: 'success',
-        componentName: 'Busi',
-        isUrgent: false,
-      ),
-    ];
+    // Tidak ada notifikasi bawaan dummy, mulai dari daftar kosong
+    return [];
   }
 
   Future<void> addNotification(ServiceNotification notification) async {
@@ -512,6 +549,111 @@ class NotificationNotifier extends AsyncNotifier<List<ServiceNotification>> {
       final updated = [notification, ...current];
       state = AsyncValue.data(updated);
       _persist(updated);
+    }
+  }
+
+  /// Mengevaluasi riwayat servis & komponen untuk menghasilkan notifikasi otomatis
+  Future<void> evaluateServiceReminders(
+    List<ServiceHistory> historyList,
+    List<ServiceComponent> components, {
+    ServiceHistory? newlyAddedService,
+  }) async {
+    final perm = ref.read(notificationPermissionProvider);
+    if (perm != NotificationPermissionStatus.granted) return;
+
+    final currentList = List<ServiceNotification>.from(state.value ?? []);
+    final List<ServiceNotification> newNotifications = [];
+
+    // 1. Notifikasi pencatatan servis baru
+    if (newlyAddedService != null) {
+      final matchedComp = components.where(
+        (c) => newlyAddedService.jenisServis.toLowerCase().contains(c.nama.toLowerCase()),
+      );
+      final nextKmText = matchedComp.isNotEmpty
+          ? ' Jadwal ${matchedComp.first.nama} berikutnya pada ${newlyAddedService.odometer + matchedComp.first.intervalKm} km.'
+          : '';
+
+      newNotifications.add(
+        ServiceNotification(
+          id: 'notif-add-${newlyAddedService.id}',
+          title: '✅ Servis ${newlyAddedService.jenisServis} Tercatat',
+          message:
+              'Servis pada odometer ${newlyAddedService.odometer} km berhasil disimpan.$nextKmText',
+          timestamp: DateTime.now(),
+          isRead: false,
+          type: 'success',
+          componentName: matchedComp.isNotEmpty ? matchedComp.first.nama : newlyAddedService.jenisServis,
+          isUrgent: false,
+        ),
+      );
+    }
+
+    // 2. Evaluasi kondisi semua komponen terhadap odometer tertinggi saat ini
+    if (historyList.isNotEmpty) {
+      final int currentOdo = historyList
+          .map((e) => e.odometer)
+          .reduce((a, b) => a > b ? a : b);
+
+      for (final comp in components) {
+        final related = historyList
+            .where(
+              (s) =>
+                  s.status == 'Selesai' &&
+                  s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
+            )
+            .toList();
+        final int lastServicedKm = related.isNotEmpty ? related.first.odometer : 0;
+        final int nextServiceKm = lastServicedKm > 0
+            ? (lastServicedKm + comp.intervalKm)
+            : comp.intervalKm;
+        final int kmRemaining = nextServiceKm > currentOdo ? (nextServiceKm - currentOdo) : 0;
+
+        if (currentOdo >= nextServiceKm && currentOdo > 0) {
+          final overdueId = 'notif-overdue-${comp.id}-$nextServiceKm';
+          final alreadyExists = currentList.any((n) => n.id == overdueId) ||
+              newNotifications.any((n) => n.id == overdueId);
+          if (!alreadyExists) {
+            newNotifications.add(
+              ServiceNotification(
+                id: overdueId,
+                title: '🚨 Waktunya Servis ${comp.nama}!',
+                message:
+                    'Odometer saat ini ($currentOdo km) telah melewati jadwal servis ${comp.nama} ($nextServiceKm km). Segera lakukan pengecekan/penggantian.',
+                timestamp: DateTime.now(),
+                isRead: false,
+                type: 'warning',
+                componentName: comp.nama,
+                isUrgent: true,
+              ),
+            );
+          }
+        } else if (kmRemaining > 0 && kmRemaining <= 500 && currentOdo > 0) {
+          final warnId = 'notif-warn-${comp.id}-$nextServiceKm';
+          final alreadyExists = currentList.any((n) => n.id == warnId) ||
+              newNotifications.any((n) => n.id == warnId);
+          if (!alreadyExists) {
+            newNotifications.add(
+              ServiceNotification(
+                id: warnId,
+                title: '⏳ Pengingat Servis: ${comp.nama}',
+                message:
+                    'Jadwal servis ${comp.nama} tinggal $kmRemaining km lagi (target: $nextServiceKm km). Siapkan jadwal perawatan motor Anda.',
+                timestamp: DateTime.now(),
+                isRead: false,
+                type: 'reminder',
+                componentName: comp.nama,
+                isUrgent: false,
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    if (newNotifications.isNotEmpty) {
+      final updated = [...newNotifications, ...currentList];
+      state = AsyncValue.data(updated);
+      await _persist(updated);
     }
   }
 
@@ -574,18 +716,166 @@ class LocationState {
     this.errorMessage,
   });
 
-  // Default coordinate: Gading Serpong, Tangerang
+  // Default coordinate: Balikpapan, Kalimantan Timur
   static const defaultLocation = LocationState(
     permission: LocationPermissionState.granted,
-    latitude: -6.2550,
-    longitude: 106.6200,
-    locationName: 'Gading Serpong, Tangerang Selatan',
+    latitude: -1.2379,
+    longitude: 116.8529,
+    locationName: 'Balikpapan, Kalimantan Timur (GPS Aktif)',
   );
 }
 
 class LocationNotifier extends Notifier<LocationState> {
+  static const String locationStorageKey = 'servisku_user_location_v2';
+
   @override
-  LocationState build() => LocationState.defaultLocation;
+  LocationState build() {
+    Future.microtask(() => detectRealLocation(useSavedIfAvailable: true));
+    return LocationState.defaultLocation;
+  }
+
+  Future<void> _saveLocation(double lat, double lng, String name) async {
+    try {
+      final prefs = ref.read(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
+      await prefs.setString(
+        locationStorageKey,
+        json.encode({'lat': lat, 'lng': lng, 'name': name}),
+      );
+    } catch (_) {}
+  }
+
+  /// Mengubah koordinat GPS (lat, lng) menjadi nama Kota & Provinsi yang bersih via BigDataCloud API
+  Future<String> _reverseGeocodeClean(double lat, double lng) async {
+    try {
+      final url = Uri.parse(
+        'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=$lat&longitude=$lng&localityLanguage=id',
+      );
+      final res = await http.get(url).timeout(const Duration(seconds: 6));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body) as Map<String, dynamic>;
+        final locality = data['locality']?.toString() ?? '';
+        final city = data['city']?.toString() ?? '';
+        final province = data['principalSubdivision']?.toString() ?? '';
+
+        final primary = city.isNotEmpty ? city : locality;
+        final parts = [primary, province]
+            .where((s) => s.trim().isNotEmpty)
+            .toSet()
+            .toList();
+        if (parts.isNotEmpty) {
+          return '${parts.join(', ')} (GPS Aktif)';
+        }
+      }
+    } catch (_) {}
+    return 'Titik GPS (${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)})';
+  }
+
+  /// Mendeteksi lokasi pengguna secara presisi menggunakan HTML5 Browser GPS (navigator.geolocation)
+  Future<void> detectRealLocation({bool useSavedIfAvailable = false}) async {
+    if (useSavedIfAvailable) {
+      try {
+        final prefs = ref.read(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
+        final saved = prefs.getString(locationStorageKey);
+        if (saved != null && saved.isNotEmpty) {
+          final map = json.decode(saved) as Map<String, dynamic>;
+          final lat = (map['lat'] as num).toDouble();
+          final lng = (map['lng'] as num).toDouble();
+          final name = map['name']?.toString() ?? '';
+          if (name.isNotEmpty && !name.startsWith('Mendeteksi') && !name.startsWith('Mencari')) {
+            state = LocationState(
+              permission: LocationPermissionState.granted,
+              latitude: lat,
+              longitude: lng,
+              locationName: name,
+            );
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Ambil koordinat GPS asli dari perangkat/browser (navigator.geolocation)
+    final gpsPos = await getBrowserGpsPosition();
+    if (gpsPos != null) {
+      final cleanName = await _reverseGeocodeClean(gpsPos.lat, gpsPos.lng);
+      state = LocationState(
+        permission: LocationPermissionState.granted,
+        latitude: gpsPos.lat,
+        longitude: gpsPos.lng,
+        locationName: cleanName,
+      );
+      await _saveLocation(gpsPos.lat, gpsPos.lng, cleanName);
+      return;
+    }
+
+    // Jika GPS browser belum diizinkan, gunakan lokasi tersimpan atau default yang bersih
+    state = LocationState(
+      permission: LocationPermissionState.granted,
+      latitude: state.latitude,
+      longitude: state.longitude,
+      locationName: state.locationName,
+    );
+  }
+
+  /// Mencari dan mengatur titik koordinat berdasarkan nama Kota / Kecamatan
+  Future<bool> searchAndSetLocation(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return false;
+
+    // 1. Cek daftar kota utama Indonesia (instan & 100% akurat)
+    for (final entry in Workshop.indonesiaCities.entries) {
+      if (entry.key.toLowerCase() == trimmed.toLowerCase() ||
+          entry.value.fullName.toLowerCase().contains(trimmed.toLowerCase())) {
+        final label = '${entry.value.fullName} (GPS Aktif)';
+        state = LocationState(
+          permission: LocationPermissionState.granted,
+          latitude: entry.value.lat,
+          longitude: entry.value.lng,
+          locationName: label,
+        );
+        await _saveLocation(entry.value.lat, entry.value.lng, label);
+        return true;
+      }
+    }
+
+    // 2. Geocode via OpenStreetMap Nominatim untuk kecamatan/kota lainnya
+    try {
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(trimmed)}&countrycodes=id&limit=1&accept-language=id',
+      );
+      final res = await http.get(url).timeout(const Duration(seconds: 6));
+      if (res.statusCode == 200) {
+        final List<dynamic> results = json.decode(res.body) as List<dynamic>;
+        if (results.isNotEmpty) {
+          final item = results.first as Map<String, dynamic>;
+          final double lat = double.parse(item['lat'].toString());
+          final double lng = double.parse(item['lon'].toString());
+          final cleanName = await _reverseGeocodeClean(lat, lng);
+
+          state = LocationState(
+            permission: LocationPermissionState.granted,
+            latitude: lat,
+            longitude: lng,
+            locationName: cleanName,
+          );
+          await _saveLocation(lat, lng, cleanName);
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [Location] Pencarian gagal: $e');
+    }
+
+    final fallbackName = '$trimmed (GPS Aktif)';
+    state = LocationState(
+      permission: LocationPermissionState.granted,
+      latitude: state.latitude,
+      longitude: state.longitude,
+      locationName: fallbackName,
+    );
+    await _saveLocation(state.latitude, state.longitude, fallbackName);
+    return true;
+  }
 
   void requestPermission() {
     state = LocationState(
@@ -597,12 +887,16 @@ class LocationNotifier extends Notifier<LocationState> {
   }
 
   void grantPermission({double? lat, double? lng, String? locName}) {
+    final newLat = lat ?? state.latitude;
+    final newLng = lng ?? state.longitude;
+    final newName = locName ?? state.locationName;
     state = LocationState(
       permission: LocationPermissionState.granted,
-      latitude: lat ?? -6.2550,
-      longitude: lng ?? 106.6200,
-      locationName: locName ?? 'Gading Serpong, Tangerang Selatan (GPS Aktif)',
+      latitude: newLat,
+      longitude: newLng,
+      locationName: newName,
     );
+    _saveLocation(newLat, newLng, newName);
   }
 
   void denyPermission() {
@@ -653,13 +947,17 @@ final workshopSearchQueryProvider = NotifierProvider<WorkshopSearchQueryNotifier
   return WorkshopSearchQueryNotifier();
 });
 
-// List bengkel terdekat yang diurutkan
+// List bengkel terdekat yang diurutkan secara dinamis mengikuti lokasi pengguna
 final nearbyWorkshopsProvider = Provider<List<Workshop>>((ref) {
   final location = ref.watch(locationProvider);
   final category = ref.watch(workshopFilterCategoryProvider);
   final search = ref.watch(workshopSearchQueryProvider).toLowerCase();
 
-  var list = List<Workshop>.from(Workshop.defaultWorkshops);
+  var list = Workshop.generateForLocation(
+    location.latitude,
+    location.longitude,
+    location.locationName,
+  );
 
   if (category != 'Semua') {
     list = list.where((w) => w.kategori == category || (category == 'Resmi' && w.isOfficial)).toList();

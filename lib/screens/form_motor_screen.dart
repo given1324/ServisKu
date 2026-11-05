@@ -189,6 +189,7 @@ class _FormMotorScreenState extends ConsumerState<FormMotorScreen> {
               TextFormField(
                 controller: _tahunController,
                 keyboardType: TextInputType.number,
+                scrollPadding: const EdgeInsets.only(bottom: 140),
                 decoration: InputDecoration(
                   hintText: 'Misal: 2023',
                   prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20, color: Color(0xFF135A4B)),

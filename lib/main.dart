@@ -4,10 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/service_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation_screen.dart';
+import 'services/supabase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+
+  // Inisialisasi koneksi ke Database Supabase PostgreSQL
+  await SupabaseService.initialize();
 
   runApp(
     // Membungkus aplikasi dengan ProviderScope dan menyuntikkan SharedPreferences yang sudah siap

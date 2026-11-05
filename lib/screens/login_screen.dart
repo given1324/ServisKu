@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/service_provider.dart';
+import 'main_navigation_screen.dart';
 
 /// Halaman Autentikasi: Login (Email & Gmail) dan Registrasi Akun
 class LoginScreen extends ConsumerStatefulWidget {
@@ -12,8 +13,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'budi.rider@gmail.com');
-  final _passwordController = TextEditingController(text: 'password123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _namaController = TextEditingController();
 
   bool _isRegisterMode = false;
@@ -63,10 +64,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         );
-        // Jika halaman ini dibuka melalui Navigator.push, tutup halaman
-        if (Navigator.canPop(context)) {
-          Navigator.pop(context);
-        }
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          (route) => false,
+        );
       }
     } catch (e) {
       setState(() {
@@ -81,6 +82,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _showGoogleSignInModal() async {
     final registeredUsers = await ref.read(authProvider.notifier).getRegisteredUsers();
     final customGmailController = TextEditingController();
+    final customPasswordController = TextEditingController();
     String? modalError;
 
     if (!mounted) return;
@@ -243,65 +245,82 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     const SizedBox(height: 16),
                     const Text(
-                      'Atau Masukkan Alamat Gmail Lain:',
+                      'Atau Masukkan Akun Gmail yang Terdaftar di Supabase:',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
                     ),
                     const SizedBox(height: 8),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: customGmailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(
-                              hintText: 'contoh@gmail.com',
-                              prefixIcon: const Icon(Icons.mail_outline, size: 20),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              filled: true,
-                              fillColor: const Color(0xFFF8FAFC),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                              ),
-                            ),
-                          ),
+                    TextField(
+                      controller: customGmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        hintText: 'contoh@gmail.com',
+                        prefixIcon: const Icon(Icons.mail_outline, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF135A4B),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: () async {
-                            final inputEmail = customGmailController.text.trim();
-                            if (inputEmail.isEmpty || !inputEmail.contains('@')) {
-                              setModalState(() {
-                                modalError = 'Format email Gmail tidak valid.';
-                              });
-                              return;
-                            }
-                            final isFound = registeredUsers.any(
-                              (u) => (u['email'] as String? ?? '').toLowerCase() == inputEmail.toLowerCase(),
-                            );
-                            if (!isFound) {
-                              setModalState(() {
-                                modalError = 'Akun Gmail ($inputEmail) belum terdaftar! Silakan mendaftar terlebih dahulu.';
-                              });
-                              return;
-                            }
-                            Navigator.pop(modalCtx);
-                            await _handleGoogleLogin(inputEmail);
-                          },
-                          child: const Text('Masuk'),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                         ),
-                      ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: customPasswordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        hintText: 'Kata Sandi Akun',
+                        prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF135A4B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () async {
+                          final inputEmail = customGmailController.text.trim();
+                          final inputPassword = customPasswordController.text.trim();
+                          if (inputEmail.isEmpty || !inputEmail.contains('@')) {
+                            setModalState(() {
+                              modalError = 'Format email Gmail tidak valid.';
+                            });
+                            return;
+                          }
+                          if (inputPassword.isEmpty) {
+                            setModalState(() {
+                              modalError = 'Masukkan kata sandi akun untuk verifikasi Supabase.';
+                            });
+                            return;
+                          }
+                          Navigator.pop(modalCtx);
+                          _emailController.text = inputEmail;
+                          _passwordController.text = inputPassword;
+                          await _submit();
+                        },
+                        child: const Text('Masuk dengan Gmail'),
+                      ),
                     ),
 
                     const SizedBox(height: 16),
@@ -357,9 +376,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         );
-        if (Navigator.canPop(context)) {
-          Navigator.pop(context);
-        }
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          (route) => false,
+        );
       }
     } catch (e) {
       setState(() {

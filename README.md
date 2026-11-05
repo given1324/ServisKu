@@ -62,3 +62,77 @@ Aplikasi ServisKu dinyatakan berhasil memenuhi tujuan pembuatannya apabila:
 3. **Sistem Keamanan Akses Berfungsi Penuh**: Mekanisme rute terproteksi berjalan dengan benar, di mana pengguna yang belum login tidak dapat mengakses dashboard, dan sesi login pengguna tetap terjaga saat aplikasi ditutup lalu dibuka kembali.
 4. **Tampilan Nyaman & Responsif**: Antarmuka aplikasi berjalan ringan, tidak rumit, sangat nyaman dibaca lewat layar smartphone, dan memiliki sistem penyimpanan lokal (*caching*) agar data tetap dapat diakses saat koneksi internet lemah.
 
+---
+
+## Panduan Pengujian untuk Reviewer
+
+Bagian ini disusun sebagai panduan langkah demi langkah bagi **Reviewer / Penguji** untuk menjalankan dan menguji seluruh fitur utama serta fitur *advanced* pada aplikasi **ServisKu**.
+
+### 1. Cara Menjalankan Aplikasi (Instalasi & Run)
+Pastikan perangkat telah terinstal **Flutter SDK** (`^3.13.4`). Jalankan perintah berikut di terminal pada direktori utama proyek:
+
+```bash
+# 1. Unduh seluruh dependensi paket Flutter
+flutter pub get
+
+# 2. Jalankan aplikasi di Browser (Chrome) atau Perangkat/Emulator Android
+flutter run -d chrome
+# atau untuk Android:
+flutter run
+```
+*(Konfigurasi koneksi Cloud **Supabase PostgreSQL & Auth** sudah terpasang secara langsung di `lib/services/supabase_service.dart`, sehingga Reviewer dapat langsung menjalankan aplikasi tanpa perlu menyiapkan file `.env` tambahan).*
+
+---
+
+### 2. Skenario Pengujian Fitur (Step-by-Step Testing Guide)
+
+#### A. Pengujian Autentikasi & Rute Terproteksi (Advance Feature 1)
+1. Saat aplikasi pertama kali dibuka, sistem otomatis mengarahkan ke **Halaman Login** (pengguna tidak dapat masuk ke Dashboard sebelum autentikasi).
+2. **Mendaftar Akun Baru (Registrasi)**:
+   - Klik tautan **"Daftar Sekarang"** di bagian bawah halaman login.
+   - Masukkan **Nama Lengkap**, **Email** (contoh: `reviewer@gmail.com`), dan **Kata Sandi** (minimal 6 karakter).
+   - Klik **"Daftar Akun Baru"** -> Anda akan otomatis masuk ke halaman **Dashboard Utama**.
+3. **Menguji Logout & Login Kembali**:
+   - Buka tab **Akun** (pojok kanan bawah) -> gulir ke bawah dan klik **"Keluar dari Akun (Logout)"**.
+   - Masuk kembali menggunakan email & kata sandi yang baru didaftarkan, atau klik tombol **"Masuk dengan Akun Gmail"**.
+
+#### B. Pengujian Informasi Motor & Akun
+1. Pada tab **Kendaraan (Dashboard)**, perhatikan kartu hijau **MOTOR UTAMA** di bagian atas.
+2. Klik tombol **"Edit"** di pojok kanan atas kartu hijau tersebut (atau buka tab **Akun** -> klik **"Edit Motor"** pada kartu *Informasi Motor & Akun*).
+3. Ubah **Nama Motor** (misal: `Honda Vario 160`), **Plat Nomor** (misal: `KT 1234 AB`), dan **Tahun** (misal: `2024`), lalu klik **Simpan**.
+4. Data motor pada Dashboard dan halaman Profil Akun akan langsung diperbarui secara *real-time* dan tersimpan ke Supabase.
+
+#### C. Pengujian Riwayat Servis (CRUD), Perhitungan Komponen & Status Selesai
+1. **Menambah Catatan Servis (`Belum Selesai`)**:
+   - Klik tombol **`+`** di pojok kanan bawah Dashboard (atau klik langsung salah satu kartu pada **Pantauan Komponen**, misalnya kartu **Oli Mesin**).
+   - Pilih/ketik jenis servis: **`Oli Mesin`**.
+   - Masukkan Odometer: **`2500`** km, Total Biaya: **`65000`**, Catatan: `Ganti oli rutin`.
+   - Biarkan Status Servis pada **`Belum Selesai`**, lalu klik **Simpan catatan**.
+   - **Hasil yang Terlihat**:
+     - Pada daftar *Riwayat terbaru*, muncul catatan `Oli Mesin` dengan status `Belum Selesai`.
+     - Pada kartu *Pantauan Komponen*, kartu **Oli Mesin** menyala **Merah (`Servis! / Waktunya ganti!`)** karena odometer sudah mencapai `2.500 km` tetapi status servisnya belum selesai.
+2. **Menandai Servis Menjadi `Selesai`**:
+   - Pada item riwayat `Oli Mesin` di bawah, klik ikon titik tiga (**`...`**) di sebelah kanan -> pilih **"Tandai Selesai"**.
+   - **Perubahan Otomatis yang Terjadi**:
+     - Ikon riwayat berubah menjadi **Centang Hijau (`✓`)** dengan keterangan *"Diselesaikan pada [Tanggal Hari Ini]"*.
+     - Kartu **Oli Mesin** di *Pantauan Komponen* otomatis me-reset jadwal berikutnya menjadi **`5,000 km (+2,500)`** dengan keterangan **`Sekitar 2,500 km lagi`** (kondisi kembali normal).
+3. **Menguji Pencarian (Search Bar)**:
+   - Ketik kata kunci (misalnya `oli` atau `kampas rem`) pada kolom pencarian di bawah *Riwayat terbaru* untuk menyaring riwayat servis dan kartu komponen secara *real-time*.
+
+#### D. Pengujian Notifikasi & Pengingat Servis (Advance Feature 2)
+1. Buka tab **Notifikasi** di navigasi bawah.
+2. Setiap kali Anda menambah riwayat servis baru atau ada komponen yang sisa jarak tempuhnya $\le 500\text{ km}$ / melewati batas kilometer, notifikasi otomatis tercatat di halaman ini.
+3. **Uji Cepat (Simulasi Instan)**:
+   - Klik ikon **Lonceng `+`** di pojok kanan atas AppBar pada halaman **Notifikasi** untuk memicu simulasi pengingat servis darurat secara instan.
+   - Klik menu titik tiga (**`⋮`**) di pojok kanan atas untuk menguji fitur **Tandai Semua Dibaca**, **Hapus Semua Notifikasi**, dan **Kelola Izin Notifikasi**.
+
+#### E. Pengujian Lokasi & Peta Bengkel Terdekat (Advance Feature 3)
+1. Buka tab **Bengkel** di navigasi bawah.
+2. Aplikasi secara otomatis mendeteksi lokasi kota/kecamatan Anda saat ini dan menampilkan daftar bengkel terdekat (Resmi Honda/AHASS, Resmi Yamaha, Bengkel Umum 24 Jam, dan Tambal Ban) beserta jarak kilometernya.
+3. **Mengubah / Mencari Kota Secara Manual**:
+   - Klik tombol **"Ubah"** pada label lokasi di pojok kiri bawah peta radar (atau klik ikon target GPS di pojok kanan atas).
+   - Ketik nama kota/kecamatan Anda (misalnya: `Samarinda`, `Balikpapan`, `Surabaya`, `Bandung`, `Yogyakarta`) lalu klik **Cari**.
+   - Daftar bengkel, alamat, dan perhitungan jarak tempuh (`km`) akan otomatis diperbarui mengikuti titik koordinat kota tersebut.
+4. Klik tombol **"Rute Maps"** pada salah satu kartu bengkel untuk melihat tautan navigasi langsung ke Google Maps.
+
+

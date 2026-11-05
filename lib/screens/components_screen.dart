@@ -246,9 +246,11 @@ class _ComponentsScreenState extends ConsumerState<ComponentsScreen> {
 
               // List of components
               ...components.map((comp) {
-                // Cari servis terakhir untuk komponen ini
+                // Cari servis terakhir yang sudah selesai untuk komponen ini
                 final relatedServices = historyList.where(
-                  (s) => s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
+                  (s) =>
+                      s.status == 'Selesai' &&
+                      s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
                 ).toList();
 
                 final int lastServicedKm = relatedServices.isNotEmpty
@@ -347,21 +349,26 @@ class _ComponentsScreenState extends ConsumerState<ComponentsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            lastServicedKm > 0
-                                ? 'Terakhir di ${NumberFormat.decimalPattern().format(lastServicedKm)} km • Sisa $kmRemaining km'
-                                : 'Belum pernah dicatat di riwayat',
-                            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                          Expanded(
+                            child: Text(
+                              lastServicedKm > 0
+                                  ? 'Terakhir di ${NumberFormat.decimalPattern().format(lastServicedKm)} km • Sisa $kmRemaining km'
+                                  : 'Belum pernah dicatat selesai di riwayat',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                            ),
                           ),
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               if (comp.isCustom) ...[
                                 IconButton(
+                                  tooltip: 'Edit Komponen',
                                   icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.grey),
                                   onPressed: () => _showAddComponentDialog(existing: comp),
                                   visualDensity: VisualDensity.compact,
                                 ),
                                 IconButton(
+                                  tooltip: 'Hapus Komponen',
                                   icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
                                   onPressed: () async {
                                     final confirm = await showDialog<bool>(
@@ -377,6 +384,14 @@ class _ComponentsScreenState extends ConsumerState<ComponentsScreen> {
                                     );
                                     if (confirm == true) {
                                       await ref.read(serviceComponentsProvider.notifier).deleteComponent(comp.id);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: Colors.redAccent,
+                                            content: Text('Komponen "${comp.nama}" berhasil dihapus.'),
+                                          ),
+                                        );
+                                      }
                                     }
                                   },
                                   visualDensity: VisualDensity.compact,

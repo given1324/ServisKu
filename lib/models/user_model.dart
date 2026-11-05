@@ -20,11 +20,10 @@ class UserModel {
 
   // Pengguna demo bawaan
   static UserModel defaultUser = UserModel(
-    id: 'usr-001',
-    nama: 'Budi Rider',
-    email: 'budi.rider@gmail.com',
-    nomorTelepon: '081234567890',
-    createdAt: DateTime.now().subtract(const Duration(days: 90)),
+    id: 'usr-new',
+    nama: 'Pengguna ServisKu',
+    email: 'user@servisku.id',
+    createdAt: DateTime.now(),
     isGuest: false,
   );
 
