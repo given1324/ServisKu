@@ -1,4 +1,4 @@
-# Dokumen Handover & Panduan Pengujian Reviewer — ServisKu
+# Dokumen Handover — ServisKu
 
 Dokumen ini disusun untuk memudahkan **Reviewer / Penguji** dalam menjalankan, mengevaluasi, dan menguji seluruh fitur pada aplikasi **ServisKu (Buku Riwayat Perawatan Motor Digital)**.
 
