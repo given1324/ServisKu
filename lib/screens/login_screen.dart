@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/service_provider.dart';
+import '../utils/validation.dart';
 import 'main_navigation_screen.dart';
 
 /// Halaman Autentikasi: Login (Email & Gmail) dan Registrasi Akun
@@ -517,12 +518,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                               ),
                             ),
-                            validator: (v) {
-                              if (v == null || v.trim().isEmpty) {
-                                return 'Nama lengkap wajib diisi';
-                              }
-                              return null;
-                            },
+                            validator: FormValidation.validateNamaLengkap,
                           ),
                           const SizedBox(height: 16),
                         ],
@@ -547,15 +543,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                             ),
                           ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Alamat email wajib diisi';
-                            }
-                            if (!v.contains('@') || !v.contains('.')) {
-                              return 'Format email tidak valid (contoh: user@gmail.com)';
-                            }
-                            return null;
-                          },
+                          validator: FormValidation.validateEmail,
                         ),
                         const SizedBox(height: 16),
 
@@ -586,15 +574,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                             ),
                           ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Kata sandi wajib diisi';
-                            }
-                            if (v.length < 6) {
-                              return 'Kata sandi minimal 6 karakter';
-                            }
-                            return null;
-                          },
+                          validator: FormValidation.validatePassword,
                         ),
                         const SizedBox(height: 24),
 

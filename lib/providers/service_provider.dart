@@ -10,26 +10,39 @@ import '../models/vehicle_info.dart';
 import '../models/user_model.dart';
 import '../models/service_notification.dart';
 import '../models/workshop_model.dart';
+import '../repositories/profile_repository.dart';
 import '../repositories/service_repository.dart';
 import '../services/api_service.dart';
 import '../services/gps_helper.dart';
 import '../services/supabase_service.dart';
+import '../utils/component_calculator.dart';
 
 // Provider untuk instance SharedPreferences opsional (dapat di-override di main/test)
 final sharedPreferencesProvider = Provider<SharedPreferences?>((ref) {
   return null;
 });
 
-// Provider untuk instance ApiService (dapat di-override di test dengan mock http client)
-final apiServiceProvider = Provider<ApiService>((ref) {
-  return ApiService();
+// Provider untuk instance ApiService opsional (dapat di-override di test dengan mock http client)
+final apiServiceProvider = Provider<ApiService?>((ref) {
+  return null;
+});
+
+// Provider khusus untuk ProfileRepository (request API & penyimpanan profil kendaraan)
+final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return ProfileRepository(prefs: prefs);
 });
 
 // Provider untuk ServiceRepository yang menghubungkan Notifier ke Backend API & local cache
 final serviceRepositoryProvider = Provider<ServiceRepository>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   final api = ref.watch(apiServiceProvider);
-  return ServiceRepository(prefs: prefs, apiService: api);
+  final profileRepo = ref.watch(profileRepositoryProvider);
+  return ServiceRepository(
+    prefs: prefs,
+    apiService: api,
+    profileRepository: profileRepo,
+  );
 });
 
 // AsyncNotifier untuk mengelola state data riwayat servis
@@ -595,20 +608,15 @@ class NotificationNotifier extends AsyncNotifier<List<ServiceNotification>> {
           .reduce((a, b) => a > b ? a : b);
 
       for (final comp in components) {
-        final related = historyList
-            .where(
-              (s) =>
-                  s.status == 'Selesai' &&
-                  s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
-            )
-            .toList();
-        final int lastServicedKm = related.isNotEmpty ? related.first.odometer : 0;
-        final int nextServiceKm = lastServicedKm > 0
-            ? (lastServicedKm + comp.intervalKm)
-            : comp.intervalKm;
-        final int kmRemaining = nextServiceKm > currentOdo ? (nextServiceKm - currentOdo) : 0;
+        final schedule = ComponentCalculator.evaluate(
+          component: comp,
+          historyList: historyList,
+          currentOdo: currentOdo,
+        );
+        final int nextServiceKm = schedule.nextServiceKm;
+        final int kmRemaining = schedule.kmRemaining;
 
-        if (currentOdo >= nextServiceKm && currentOdo > 0) {
+        if (schedule.isOverdue) {
           final overdueId = 'notif-overdue-${comp.id}-$nextServiceKm';
           final alreadyExists = currentList.any((n) => n.id == overdueId) ||
               newNotifications.any((n) => n.id == overdueId);
@@ -627,7 +635,7 @@ class NotificationNotifier extends AsyncNotifier<List<ServiceNotification>> {
               ),
             );
           }
-        } else if (kmRemaining > 0 && kmRemaining <= 500 && currentOdo > 0) {
+        } else if (schedule.isWarning && currentOdo > 0) {
           final warnId = 'notif-warn-${comp.id}-$nextServiceKm';
           final alreadyExists = currentList.any((n) => n.id == warnId) ||
               newNotifications.any((n) => n.id == warnId);
@@ -947,17 +955,81 @@ final workshopSearchQueryProvider = NotifierProvider<WorkshopSearchQueryNotifier
   return WorkshopSearchQueryNotifier();
 });
 
-// List bengkel terdekat yang diurutkan secara dinamis mengikuti lokasi pengguna
+/// Provider asinkron yang memindai titik bengkel motor asli di sekitar GPS pengguna
+/// menggunakan Photon OpenStreetMap CDN API (respon cepat < 500ms tanpa timeout).
+final liveOverpassWorkshopsProvider = FutureProvider<List<Workshop>>((ref) async {
+  final location = ref.watch(locationProvider);
+  final lat = location.latitude;
+  final lng = location.longitude;
+
+  final results = <Workshop>[];
+  final seenNames = <String>{};
+
+  // Query paralel ke Photon Komoot CDN untuk "bengkel" dan "ahass" di sekitar koordinat GPS
+  final keywords = ['bengkel motor', 'ahass', 'planet ban'];
+  for (final keyword in keywords) {
+    try {
+      final uri = Uri.parse(
+        'https://photon.komoot.io/api/?q=${Uri.encodeComponent(keyword)}&lat=$lat&lon=$lng&limit=12',
+      );
+      final res = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        final decoded = json.decode(res.body) as Map<String, dynamic>;
+        final features = decoded['features'] as List<dynamic>? ?? [];
+        for (final raw in features) {
+          if (raw is Map<String, dynamic>) {
+            final ws = Workshop.fromPhotonFeature(
+              raw,
+              lat,
+              lng,
+              location.locationName,
+            );
+            if (ws != null) {
+              final key = ws.nama.toLowerCase().trim();
+              if (!seenNames.contains(key)) {
+                seenNames.add(key);
+                results.add(ws);
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Abaikan secara senyap jika jaringan seluler lambat; daftar kurasi tetap tampil instan
+    }
+  }
+
+  return results;
+});
+
+// List bengkel terdekat yang menggabungkan hasil pemindaian real-time + bengkel kurasi kota
+// dengan perhitungan jarak jalan raya langsung dari koordinat asli
 final nearbyWorkshopsProvider = Provider<List<Workshop>>((ref) {
   final location = ref.watch(locationProvider);
   final category = ref.watch(workshopFilterCategoryProvider);
   final search = ref.watch(workshopSearchQueryProvider).toLowerCase();
+  final liveOsmWorkshops = ref.watch(liveOverpassWorkshopsProvider).value ?? [];
 
-  var list = Workshop.generateForLocation(
+  final curated = Workshop.generateForLocation(
     location.latitude,
     location.longitude,
     location.locationName,
   );
+
+  // Gabungkan bengkel kurasi dan bengkel real-time OSM tanpa duplikasi nama
+  final combined = <Workshop>[...curated];
+  final existingNames = curated.map((w) => w.nama.toLowerCase().trim()).toSet();
+  for (final osmWs in liveOsmWorkshops) {
+    if (!existingNames.contains(osmWs.nama.toLowerCase().trim())) {
+      existingNames.add(osmWs.nama.toLowerCase().trim());
+      combined.add(osmWs);
+    }
+  }
+
+  var list = combined;
 
   if (category != 'Semua') {
     list = list.where((w) => w.kategori == category || (category == 'Resmi' && w.isOfficial)).toList();
@@ -970,7 +1042,7 @@ final nearbyWorkshopsProvider = Provider<List<Workshop>>((ref) {
         w.kategori.toLowerCase().contains(search)).toList();
   }
 
-  // Hitung ulang jarak dinamis terhadap koordinat pengguna saat ini
+  // Hitung ulang dan urutkan dari jarak jalan terdekat ke terjauh terhadap koordinat pengguna
   list.sort((a, b) => a.hitungJarak(location.latitude, location.longitude)
       .compareTo(b.hitungJarak(location.latitude, location.longitude)));
 

@@ -3,10 +3,12 @@ package com.example.serviceku
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -47,6 +49,20 @@ class MainActivity : FlutterActivity() {
                             1001
                         )
                     }
+                } else if (call.method == "openExternalUrl") {
+                    val url = call.argument<String>("url")
+                    if (!url.isNullOrBlank()) {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (_: Exception) {
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(false)
+                    }
                 } else {
                     result.notImplemented()
                 }
@@ -83,6 +99,7 @@ class MainActivity : FlutterActivity() {
             )
 
             var bestLocation: Location? = null
+            val nowMs = System.currentTimeMillis()
             for (provider in providers) {
                 try {
                     if (locationManager.isProviderEnabled(provider)) {
@@ -96,17 +113,27 @@ class MainActivity : FlutterActivity() {
                 } catch (_: Exception) {}
             }
 
-            if (bestLocation != null) {
+            // Hanya gunakan cache langsung jika masih sangat baru (< 2 menit) DAN akurasinya tinggi (<= 60 meter)
+            if (bestLocation != null &&
+                (nowMs - bestLocation.time) < 120_000L &&
+                bestLocation.hasAccuracy() &&
+                bestLocation.accuracy <= 60f
+            ) {
                 result.success(mapOf("lat" to bestLocation.latitude, "lng" to bestLocation.longitude))
                 return
             }
 
-            // Jika cache lokasi kosong, minta pembacaan GPS/Network aktif secara real-time
+            // Minta pembacaan GPS satelit presisi tinggi + Network secara real-time
             var responded = false
+            var bestFreshLocation: Location? = bestLocation
             val handler = Handler(Looper.getMainLooper())
             val listener = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
-                    if (!responded) {
+                    if (bestFreshLocation == null || location.accuracy < bestFreshLocation!!.accuracy) {
+                        bestFreshLocation = location
+                    }
+                    // Jika mendapat pembacaan presisi tinggi (<= 65m atau dari GPS satelit), langsung kirim
+                    if (!responded && (location.provider == LocationManager.GPS_PROVIDER || location.accuracy <= 65f)) {
                         responded = true
                         locationManager.removeUpdates(this)
                         result.success(mapOf("lat" to location.latitude, "lng" to location.longitude))
@@ -117,21 +144,31 @@ class MainActivity : FlutterActivity() {
                 override fun onProviderDisabled(provider: String) {}
             }
 
-            val activeProvider = when {
-                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-                locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-                else -> null
+            var anyProviderRegistered = false
+            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0L, 0f, listener, Looper.getMainLooper())
+                anyProviderRegistered = true
+            }
+            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0L, 0f, listener, Looper.getMainLooper())
+                anyProviderRegistered = true
             }
 
-            if (activeProvider != null) {
-                locationManager.requestLocationUpdates(activeProvider, 0L, 0f, listener, Looper.getMainLooper())
+            if (anyProviderRegistered) {
                 handler.postDelayed({
                     if (!responded) {
                         responded = true
                         locationManager.removeUpdates(listener)
-                        result.success(null)
+                        val finalLoc = bestFreshLocation
+                        if (finalLoc != null) {
+                            result.success(mapOf("lat" to finalLoc.latitude, "lng" to finalLoc.longitude))
+                        } else {
+                            result.success(null)
+                        }
                     }
-                }, 7000)
+                }, 4500)
+            } else if (bestLocation != null) {
+                result.success(mapOf("lat" to bestLocation.latitude, "lng" to bestLocation.longitude))
             } else {
                 result.success(null)
             }

@@ -5,6 +5,7 @@ import '../models/service_history.dart';
 import '../models/vehicle_info.dart';
 import '../providers/service_provider.dart';
 import '../services/api_service.dart';
+import '../utils/component_calculator.dart';
 import 'components_screen.dart';
 import 'form_motor_screen.dart';
 import 'form_service_screen.dart';
@@ -75,36 +76,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     required int currentOdo,
     double? width,
   }) {
-    final completedServices = historyList.where(
-      (s) =>
-          s.status == 'Selesai' &&
-          s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
-    ).toList();
-
-    final hasPendingService = historyList.any(
-      (s) =>
-          s.status != 'Selesai' &&
-          s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
+    final schedule = ComponentCalculator.evaluate(
+      component: comp,
+      historyList: historyList,
+      currentOdo: currentOdo,
     );
-
-    final int lastServicedKm = completedServices.isNotEmpty
-        ? completedServices.first.odometer
-        : 0;
-
-    final int nextServiceKm = lastServicedKm > 0
-        ? (lastServicedKm + comp.intervalKm)
-        : comp.intervalKm;
-
-    final int kmRemaining = nextServiceKm > currentOdo
-        ? (nextServiceKm - currentOdo)
-        : 0;
-
-    final bool isOverdue = currentOdo >= nextServiceKm && currentOdo > 0;
-    final bool isWarning = kmRemaining > 0 && kmRemaining <= 500;
-
-    final double progress = lastServicedKm > 0
-        ? ((comp.intervalKm - kmRemaining) / comp.intervalKm).clamp(0.0, 1.0)
-        : (currentOdo > 0 ? (currentOdo / nextServiceKm).clamp(0.0, 1.0) : 0.0);
+    final bool hasPendingService = schedule.hasPendingService;
+    final int lastServicedKm = schedule.lastServicedKm;
+    final int nextServiceKm = schedule.nextServiceKm;
+    final int kmRemaining = schedule.kmRemaining;
+    final bool isOverdue = schedule.isOverdue;
+    final bool isWarning = schedule.isWarning;
+    final double progress = schedule.progress;
 
     final Color statusColor = isOverdue
         ? Colors.red
@@ -286,30 +269,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final safeIndex = _topCardIndex.clamp(0, displayComponents.length - 1);
     final comp = displayComponents[safeIndex];
 
-    final completedServices = historyList.where(
-      (s) =>
-          s.status == 'Selesai' &&
-          s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
-    ).toList();
-
-    final int lastServicedKm = completedServices.isNotEmpty
-        ? completedServices.first.odometer
-        : 0;
-
-    final int nextServiceKm = lastServicedKm > 0
-        ? (lastServicedKm + comp.intervalKm)
-        : comp.intervalKm;
-
-    final int kmRemaining = nextServiceKm > currentOdo
-        ? (nextServiceKm - currentOdo)
-        : 0;
-
-    final bool isOverdue = currentOdo >= nextServiceKm && currentOdo > 0;
-    final bool isWarning = kmRemaining > 0 && kmRemaining <= 500;
-
-    final double progress = lastServicedKm > 0
-        ? ((comp.intervalKm - kmRemaining) / comp.intervalKm).clamp(0.0, 1.0)
-        : (currentOdo > 0 ? (currentOdo / nextServiceKm).clamp(0.0, 1.0) : 0.0);
+    final schedule = ComponentCalculator.evaluate(
+      component: comp,
+      historyList: historyList,
+      currentOdo: currentOdo,
+    );
+    final int nextServiceKm = schedule.nextServiceKm;
+    final int kmRemaining = schedule.kmRemaining;
+    final bool isOverdue = schedule.isOverdue;
+    final bool isWarning = schedule.isWarning;
+    final double progress = schedule.progress;
 
     final Color statusColor = isOverdue
         ? Colors.red

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/workshop_model.dart';
 import '../providers/service_provider.dart';
+import '../services/gps_helper.dart';
 
 /// Layar Pencari Bengkel Terdekat Berdasarkan Google Maps (MVP Advance Feature 3)
 class WorkshopMapScreen extends ConsumerStatefulWidget {
@@ -291,7 +292,7 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
                 label: const Text('Buka Rute di Google Maps', style: TextStyle(fontWeight: FontWeight.bold)),
                 onPressed: () {
                   Navigator.pop(ctx);
-                  _showLinkDialog('Rute Navigasi Google Maps', routeUrl);
+                  _launchGoogleMaps('Rute ${workshop.nama}', routeUrl);
                 },
               ),
               const SizedBox(height: 10),
@@ -306,7 +307,7 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
                 label: const Text('Buka Profil Bengkel di Google Maps'),
                 onPressed: () {
                   Navigator.pop(ctx);
-                  _showLinkDialog('Pencarian Google Maps', searchUrl);
+                  _launchGoogleMaps(workshop.nama, searchUrl);
                 },
               ),
             ],
@@ -314,6 +315,25 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
         );
       },
     );
+  }
+
+  Future<void> _launchGoogleMaps(String title, String url) async {
+    final opened = await openExternalMapUrl(url);
+    if (!mounted) return;
+    if (opened) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF135A4B),
+          duration: const Duration(seconds: 2),
+          content: Text(
+            'Membuka $title di Google Maps...',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+    } else {
+      _showLinkDialog(title, url);
+    }
   }
 
   void _showLinkDialog(String title, String url) {
@@ -368,6 +388,7 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
     final locationState = ref.watch(locationProvider);
     final workshops = ref.watch(nearbyWorkshopsProvider);
     final selectedCategory = ref.watch(workshopFilterCategoryProvider);
+    final liveOsmState = ref.watch(liveOverpassWorkshopsProvider);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -557,19 +578,46 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
             child: TextField(
               controller: _searchController,
               style: const TextStyle(color: Color(0xFF1E293B), fontSize: 13),
+              textInputAction: TextInputAction.search,
+              onSubmitted: (val) {
+                final q = val.trim();
+                final searchQuery = q.isEmpty
+                    ? 'bengkel motor terdekat ${locationState.locationName}'
+                    : '$q ${locationState.locationName}';
+                final url = 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(searchQuery)}';
+                _launchGoogleMaps('Pencarian "$searchQuery"', url);
+              },
               decoration: InputDecoration(
                 hintText: 'Cari nama bengkel, alamat, atau AHASS...',
                 hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                 prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B), size: 20),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
+                        tooltip: 'Hapus pencarian',
                         icon: const Icon(Icons.clear, color: Colors.grey, size: 18),
                         onPressed: () {
                           _searchController.clear();
                           ref.read(workshopSearchQueryProvider.notifier).setQuery('');
+                          setState(() {});
                         },
-                      )
-                    : null,
+                      ),
+                    IconButton(
+                      tooltip: 'Cari langsung di Google Maps',
+                      icon: const Icon(Icons.open_in_new_rounded, color: Color(0xFF135A4B), size: 18),
+                      onPressed: () {
+                        final q = _searchController.text.trim();
+                        final searchQuery = q.isEmpty
+                            ? 'bengkel motor terdekat ${locationState.locationName}'
+                            : '$q ${locationState.locationName}';
+                        final url = 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(searchQuery)}';
+                        _launchGoogleMaps('Pencarian Google Maps', url);
+                      },
+                    ),
+                  ],
+                ),
                 filled: true,
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -584,6 +632,7 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
               ),
               onChanged: (val) {
                 ref.read(workshopSearchQueryProvider.notifier).setQuery(val);
+                setState(() {});
               },
             ),
           ),
@@ -608,6 +657,43 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
           ),
 
           const SizedBox(height: 6),
+
+          // Informasi Jumlah Bengkel Terdeteksi & Status Pemindaian Real-time
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Ditemukan ${workshops.length} bengkel terdekat',
+                  style: const TextStyle(
+                    color: Color(0xFF475569),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (liveOsmState.isLoading)
+                  const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.8,
+                          color: Color(0xFF135A4B),
+                        ),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Memindai peta sekitar...',
+                        style: TextStyle(color: Color(0xFF135A4B), fontSize: 10),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
 
           // Daftar Bengkel Terdekat (Empty State & Cards)
           Expanded(
@@ -699,8 +785,11 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
   }
 
   Widget _buildWorkshopCard(Workshop item, double distance, double userLat, double userLng) {
-    return Container(
-      padding: const EdgeInsets.all(16),
+    return InkWell(
+      onTap: () => _showGoogleMapsModal(item, userLat, userLng),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -810,6 +899,24 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
           Row(
             children: [
               Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF135A4B),
+                    side: const BorderSide(color: Color(0xFF135A4B)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 15),
+                  label: const Text(
+                    'Profil Maps',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => _launchGoogleMaps(item.nama, item.getGoogleMapsSearchUrl()),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF135A4B),
@@ -817,15 +924,21 @@ class _WorkshopMapScreenState extends ConsumerState<WorkshopMapScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  icon: const Icon(Icons.map_rounded, size: 16),
-                  label: const Text('Buka di Google Maps',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  onPressed: () => _showGoogleMapsModal(item, userLat, userLng),
+                  icon: const Icon(Icons.directions_rounded, size: 16),
+                  label: const Text(
+                    'Buka Rute Google Maps',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => _launchGoogleMaps(
+                    'Rute ${item.nama}',
+                    item.getGoogleMapsDirectionUrl(userLat, userLng),
+                  ),
                 ),
               ),
             ],
           ),
         ],
+      ),
       ),
     );
   }

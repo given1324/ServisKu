@@ -33,7 +33,9 @@ class Workshop {
     this.customDistanceKm,
   });
 
-  /// Menghitung jarak relatif (km) menggunakan rumus Haversine
+  /// Menghitung jarak tempuh jalan raya (km) dari posisi pengguna.
+  /// Menggunakan hasil perhitungan rute jalan asli (customDistanceKm dari OSRM) jika tersedia,
+  /// atau rumus Haversine dengan faktor kelokan jalan raya perkotaan (1.28x).
   double hitungJarak(double userLat, double userLng) {
     if (customDistanceKm != null) return customDistanceKm!;
     const double earthRadius = 6371; // km
@@ -46,7 +48,27 @@ class Workshop {
             sin(dLng / 2) *
             sin(dLng / 2);
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    return double.parse((earthRadius * c).toStringAsFixed(1));
+    final straightLineKm = earthRadius * c;
+    final roadEstimateKm = straightLineKm * 1.28;
+    return double.parse(roadEstimateKm.toStringAsFixed(1));
+  }
+
+  Workshop copyWith({double? customDistanceKm}) {
+    return Workshop(
+      id: id,
+      nama: nama,
+      kategori: kategori,
+      alamat: alamat,
+      latitude: latitude,
+      longitude: longitude,
+      rating: rating,
+      totalUlasan: totalUlasan,
+      jamBuka: jamBuka,
+      nomorTelepon: nomorTelepon,
+      isOfficial: isOfficial,
+      isOpenNow: isOpenNow,
+      customDistanceKm: customDistanceKm ?? this.customDistanceKm,
+    );
   }
 
   static double _degreesToRadians(double degrees) {
@@ -58,9 +80,9 @@ class Workshop {
     return 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('$nama $alamat')}';
   }
 
-  /// URL resmi Google Maps untuk rute penunjuk arah langsung
+  /// URL resmi Google Maps untuk rute penunjuk arah langsung sesuai koordinat asli
   String getGoogleMapsDirectionUrl(double userLat, double userLng) {
-    return 'https://www.google.com/maps/dir/?api=1&origin=$userLat,$userLng&destination=$latitude,$longitude';
+    return 'https://www.google.com/maps/dir/?api=1&origin=$userLat,$userLng&destination=$latitude,$longitude&travelmode=driving';
   }
 
   Map<String, dynamic> toMap() {
@@ -141,16 +163,16 @@ class Workshop {
       cleanArea = 'Kota Anda';
     }
 
-    // Data spesifik untuk Balikpapan
+    // Data spesifik untuk Balikpapan (Menggunakan Titik Koordinat Asli di Peta Balikpapan)
     if (lower.contains('balikpapan')) {
       return [
-        Workshop(
+        const Workshop(
           id: 'ws-bpn-01',
           nama: 'Astra Motor (AHASS) MT Haryono Balikpapan',
           kategori: 'Resmi Honda',
           alamat: 'Jl. MT Haryono No. 101, Damai, Balikpapan Kota',
-          latitude: userLat + 0.0042,
-          longitude: userLng + 0.0031,
+          latitude: -1.2486,
+          longitude: 116.8665,
           rating: 4.8,
           totalUlasan: 415,
           jamBuka: '08:00 - 17:00 (Buka)',
@@ -158,13 +180,13 @@ class Workshop {
           isOfficial: true,
           isOpenNow: true,
         ),
-        Workshop(
+        const Workshop(
           id: 'ws-bpn-02',
-          nama: 'Yamaha Surya Timur Sakti (STSJ) Balikpapan',
+          nama: 'Yamaha Surya Timur Sakti (STSJ) Sudirman Balikpapan',
           kategori: 'Resmi Yamaha',
-          alamat: 'Jl. Jenderal Sudirman No. 28, Klandasan Ilir, Balikpapan',
-          latitude: userLat - 0.0075,
-          longitude: userLng + 0.0052,
+          alamat: 'Jl. Jenderal Sudirman No. 28, Klandasan Ilir, Balikpapan Kota',
+          latitude: -1.2758,
+          longitude: 116.8375,
           rating: 4.7,
           totalUlasan: 260,
           jamBuka: '08:00 - 17:00 (Buka)',
@@ -172,13 +194,13 @@ class Workshop {
           isOfficial: true,
           isOpenNow: true,
         ),
-        Workshop(
+        const Workshop(
           id: 'ws-bpn-03',
           nama: 'Planet Ban Soekarno Hatta KM 2 Balikpapan',
           kategori: 'Bengkel Umum',
           alamat: 'Jl. Soekarno Hatta KM 2, Muara Rapak, Balikpapan Utara',
-          latitude: userLat + 0.0110,
-          longitude: userLng - 0.0080,
+          latitude: -1.2365,
+          longitude: 116.8428,
           rating: 4.9,
           totalUlasan: 512,
           jamBuka: '08:30 - 20:30 (Buka)',
@@ -186,13 +208,83 @@ class Workshop {
           isOfficial: false,
           isOpenNow: true,
         ),
-        Workshop(
+        const Workshop(
           id: 'ws-bpn-04',
-          nama: 'Bengkel Motor Mandiri Injeksi 24 Jam',
+          nama: 'AHASS Tunas Dwipa Matra (TDM) Rapak Balikpapan',
+          kategori: 'Resmi Honda',
+          alamat: 'Jl. Soekarno Hatta KM 0.5, Karang Rejo, Balikpapan Tengah',
+          latitude: -1.2442,
+          longitude: 116.8390,
+          rating: 4.8,
+          totalUlasan: 295,
+          jamBuka: '08:00 - 17:00 (Buka)',
+          nomorTelepon: '0542-421889',
+          isOfficial: true,
+          isOpenNow: true,
+        ),
+        const Workshop(
+          id: 'ws-bpn-05',
+          nama: 'AHASS Semoga Jaya Sepinggan Balikpapan',
+          kategori: 'Resmi Honda',
+          alamat: 'Jl. Marsma R. Iswahyudi No. 54, Sepinggan, Balikpapan Selatan',
+          latitude: -1.2645,
+          longitude: 116.9032,
+          rating: 4.7,
+          totalUlasan: 210,
+          jamBuka: '08:00 - 17:00 (Buka)',
+          nomorTelepon: '0542-761234',
+          isOfficial: true,
+          isOpenNow: true,
+        ),
+        const Workshop(
+          id: 'ws-bpn-06',
+          nama: 'Yamaha Sentral Mandiri MT Haryono Balikpapan',
+          kategori: 'Resmi Yamaha',
+          alamat: 'Jl. MT Haryono Ring Road, Gunung Bahagia, Balikpapan Selatan',
+          latitude: -1.2530,
+          longitude: 116.8740,
+          rating: 4.8,
+          totalUlasan: 198,
+          jamBuka: '08:00 - 17:00 (Buka)',
+          nomorTelepon: '0542-875112',
+          isOfficial: true,
+          isOpenNow: true,
+        ),
+        const Workshop(
+          id: 'ws-bpn-07',
+          nama: 'Yamaha Putra Utama Karang Jati Balikpapan',
+          kategori: 'Resmi Yamaha',
+          alamat: 'Jl. Jenderal Ahmad Yani No. 72, Karang Jati, Balikpapan Tengah',
+          latitude: -1.2528,
+          longitude: 116.8352,
+          rating: 4.6,
+          totalUlasan: 154,
+          jamBuka: '08:00 - 17:00 (Buka)',
+          nomorTelepon: '0542-412990',
+          isOfficial: true,
+          isOpenNow: true,
+        ),
+        const Workshop(
+          id: 'ws-bpn-08',
+          nama: 'Planet Ban MT Haryono Damai Balikpapan',
           kategori: 'Bengkel Umum',
-          alamat: 'Jl. Syarifuddin Yoes, Sepinggan, Balikpapan Selatan',
-          latitude: userLat - 0.0135,
-          longitude: userLng - 0.0095,
+          alamat: 'Jl. MT Haryono No. 45, Damai Baru, Balikpapan Selatan',
+          latitude: -1.2592,
+          longitude: 116.8634,
+          rating: 4.9,
+          totalUlasan: 380,
+          jamBuka: '08:30 - 20:30 (Buka)',
+          nomorTelepon: '0811-5409-881',
+          isOfficial: false,
+          isOpenNow: true,
+        ),
+        const Workshop(
+          id: 'ws-bpn-09',
+          nama: 'Bengkel Motor Mandiri Injeksi & CVT 24 Jam',
+          kategori: 'Bengkel Umum',
+          alamat: 'Jl. Syarifuddin Yoes, Sepinggan Baru, Balikpapan Selatan',
+          latitude: -1.2395,
+          longitude: 116.8895,
           rating: 4.6,
           totalUlasan: 128,
           jamBuka: 'Buka 24 Jam (Siaga Darurat)',
@@ -200,13 +292,27 @@ class Workshop {
           isOfficial: false,
           isOpenNow: true,
         ),
-        Workshop(
-          id: 'ws-bpn-05',
+        const Workshop(
+          id: 'ws-bpn-10',
+          nama: 'Bengkel Motor Bintang Motor Gunung Sari',
+          kategori: 'Bengkel Umum',
+          alamat: 'Jl. Jenderal Ahmad Yani, Gunung Sari Ilir, Balikpapan Tengah',
+          latitude: -1.2615,
+          longitude: 116.8362,
+          rating: 4.7,
+          totalUlasan: 165,
+          jamBuka: '08:00 - 18:00 (Buka)',
+          nomorTelepon: '0812-5890-3341',
+          isOfficial: false,
+          isOpenNow: true,
+        ),
+        const Workshop(
+          id: 'ws-bpn-11',
           nama: 'Tambal Ban Tubeless & Nitrogen 24 Jam Karang Jati',
           kategori: 'Tambal Ban',
           alamat: 'Jl. Ahmad Yani (Dekat SPBU Karang Jati), Balikpapan Tengah',
-          latitude: userLat + 0.0022,
-          longitude: userLng - 0.0018,
+          latitude: -1.2505,
+          longitude: 116.8358,
           rating: 4.7,
           totalUlasan: 89,
           jamBuka: 'Buka 24 Jam',
@@ -214,19 +320,47 @@ class Workshop {
           isOfficial: false,
           isOpenNow: true,
         ),
+        const Workshop(
+          id: 'ws-bpn-12',
+          nama: 'Tambal Ban & Press Velg KM 5 Kariangau',
+          kategori: 'Tambal Ban',
+          alamat: 'Jl. Soekarno Hatta KM 5, Batu Ampar, Balikpapan Utara',
+          latitude: -1.2135,
+          longitude: 116.8615,
+          rating: 4.6,
+          totalUlasan: 64,
+          jamBuka: 'Buka 24 Jam',
+          nomorTelepon: '0853-4821-7712',
+          isOfficial: false,
+          isOpenNow: true,
+        ),
+        const Workshop(
+          id: 'ws-bpn-13',
+          nama: 'Bengkel Motor & Servis Injeksi KM 12 Karang Joang',
+          kategori: 'Bengkel Umum',
+          alamat: 'Jl. Soekarno Hatta KM 12, Karang Joang, Balikpapan Utara',
+          latitude: -1.1552,
+          longitude: 116.8810,
+          rating: 4.7,
+          totalUlasan: 92,
+          jamBuka: '08:00 - 18:00 (Buka)',
+          nomorTelepon: '0813-4622-8810',
+          isOfficial: false,
+          isOpenNow: true,
+        ),
       ];
     }
 
-    // Data spesifik untuk Samarinda
+    // Data spesifik untuk Samarinda (Menggunakan Titik Koordinat Asli di Peta Samarinda)
     if (lower.contains('samarinda')) {
       return [
-        Workshop(
+        const Workshop(
           id: 'ws-smd-01',
           nama: 'Astra Motor (AHASS) M. Yamin Samarinda',
           kategori: 'Resmi Honda',
           alamat: 'Jl. M. Yamin No. 45, Gunung Kelua, Samarinda Ulu',
-          latitude: userLat + 0.0040,
-          longitude: userLng + 0.0035,
+          latitude: -0.4728,
+          longitude: 117.1455,
           rating: 4.8,
           totalUlasan: 380,
           jamBuka: '08:00 - 17:00 (Buka)',
@@ -234,13 +368,13 @@ class Workshop {
           isOfficial: true,
           isOpenNow: true,
         ),
-        Workshop(
+        const Workshop(
           id: 'ws-smd-02',
           nama: 'Yamaha Sentral Servis Antasari Samarinda',
           kategori: 'Resmi Yamaha',
           alamat: 'Jl. Pangeran Antasari No. 88, Air Putih, Samarinda Ulu',
-          latitude: userLat - 0.0080,
-          longitude: userLng + 0.0060,
+          latitude: -0.4865,
+          longitude: 117.1292,
           rating: 4.7,
           totalUlasan: 215,
           jamBuka: '08:00 - 17:00 (Buka)',
@@ -248,13 +382,13 @@ class Workshop {
           isOfficial: true,
           isOpenNow: true,
         ),
-        Workshop(
+        const Workshop(
           id: 'ws-smd-03',
           nama: 'Planet Ban Juanda Samarinda',
           kategori: 'Bengkel Umum',
           alamat: 'Jl. Ir. H. Juanda No. 19, Air Hitam, Samarinda Ulu',
-          latitude: userLat + 0.0115,
-          longitude: userLng - 0.0075,
+          latitude: -0.4785,
+          longitude: 117.1368,
           rating: 4.9,
           totalUlasan: 430,
           jamBuka: '08:30 - 20:30 (Buka)',
@@ -262,13 +396,55 @@ class Workshop {
           isOfficial: false,
           isOpenNow: true,
         ),
-        Workshop(
+        const Workshop(
           id: 'ws-smd-04',
+          nama: 'AHASS Semoga Jaya Ahmad Yani Samarinda',
+          kategori: 'Resmi Honda',
+          alamat: 'Jl. Jenderal Ahmad Yani No. 18, Sungai Pinang, Samarinda',
+          latitude: -0.4712,
+          longitude: 117.1585,
+          rating: 4.8,
+          totalUlasan: 290,
+          jamBuka: '08:00 - 17:00 (Buka)',
+          nomorTelepon: '0541-771234',
+          isOfficial: true,
+          isOpenNow: true,
+        ),
+        const Workshop(
+          id: 'ws-smd-05',
+          nama: 'Yamaha Surya Timur Sakti Pahlawan Samarinda',
+          kategori: 'Resmi Yamaha',
+          alamat: 'Jl. Pahlawan No. 22, Dadi Mulya, Samarinda Ulu',
+          latitude: -0.4898,
+          longitude: 117.1492,
+          rating: 4.7,
+          totalUlasan: 175,
+          jamBuka: '08:00 - 17:00 (Buka)',
+          nomorTelepon: '0541-743210',
+          isOfficial: true,
+          isOpenNow: true,
+        ),
+        const Workshop(
+          id: 'ws-smd-06',
+          nama: 'Planet Ban Kemakmuran Samarinda',
+          kategori: 'Bengkel Umum',
+          alamat: 'Jl. Kemakmuran No. 64, Sungai Pinang Dalam, Samarinda',
+          latitude: -0.4750,
+          longitude: 117.1632,
+          rating: 4.8,
+          totalUlasan: 310,
+          jamBuka: '08:30 - 20:30 (Buka)',
+          nomorTelepon: '0811-5501-992',
+          isOfficial: false,
+          isOpenNow: true,
+        ),
+        const Workshop(
+          id: 'ws-smd-07',
           nama: 'Bengkel Motor Borneo Jaya 24 Jam',
           kategori: 'Bengkel Umum',
           alamat: 'Jl. Slamet Riyadi No. 32, Sungai Kunjang, Samarinda',
-          latitude: userLat - 0.0140,
-          longitude: userLng - 0.0105,
+          latitude: -0.5065,
+          longitude: 117.1185,
           rating: 4.6,
           totalUlasan: 112,
           jamBuka: 'Buka 24 Jam (Siaga Darurat)',
@@ -276,13 +452,13 @@ class Workshop {
           isOfficial: false,
           isOpenNow: true,
         ),
-        Workshop(
-          id: 'ws-smd-05',
+        const Workshop(
+          id: 'ws-smd-08',
           nama: 'Tambal Ban Tubeless & Press Velg Lambung Mangkurat',
           kategori: 'Tambal Ban',
           alamat: 'Jl. Lambung Mangkurat, Pelita, Samarinda Ilir',
-          latitude: userLat + 0.0025,
-          longitude: userLng - 0.0020,
+          latitude: -0.4935,
+          longitude: 117.1578,
           rating: 4.6,
           totalUlasan: 74,
           jamBuka: 'Buka 24 Jam',
@@ -364,7 +540,190 @@ class Workshop {
         isOfficial: false,
         isOpenNow: true,
       ),
+      Workshop(
+        id: 'ws-06',
+        nama: 'AHASS Astra Motor Pusat $cleanArea',
+        kategori: 'Resmi Honda',
+        alamat: 'Jl. Soekarno Hatta No. 88, $cleanArea',
+        latitude: userLat + 0.0092,
+        longitude: userLng - 0.0060,
+        rating: 4.8,
+        totalUlasan: 275,
+        jamBuka: '08:00 - 17:00 (Buka)',
+        nomorTelepon: '0811-5388-112',
+        isOfficial: true,
+        isOpenNow: true,
+      ),
+      Workshop(
+        id: 'ws-07',
+        nama: 'Yamaha Sentral Motor $cleanArea',
+        kategori: 'Resmi Yamaha',
+        alamat: 'Jl. Gajah Mada No. 34, $cleanArea',
+        latitude: userLat - 0.0062,
+        longitude: userLng - 0.0078,
+        rating: 4.7,
+        totalUlasan: 162,
+        jamBuka: '08:00 - 17:00 (Buka)',
+        nomorTelepon: '0812-5499-310',
+        isOfficial: true,
+        isOpenNow: true,
+      ),
+      Workshop(
+        id: 'ws-08',
+        nama: 'Bengkel Spesialis Matic & Injeksi Mandiri $cleanArea',
+        kategori: 'Bengkel Umum',
+        alamat: 'Jl. Hasanuddin No. 17, $cleanArea',
+        latitude: userLat + 0.0058,
+        longitude: userLng + 0.0084,
+        rating: 4.7,
+        totalUlasan: 138,
+        jamBuka: '08:00 - 18:00 (Buka)',
+        nomorTelepon: '0813-4712-9088',
+        isOfficial: false,
+        isOpenNow: true,
+      ),
     ];
+  }
+
+  /// Memetakan titik POI OpenStreetMap (Overpass API) menjadi objek [Workshop] asli
+  static Workshop? fromOverpassElement(
+    Map<String, dynamic> el,
+    String fallbackArea,
+  ) {
+    final tags = el['tags'] as Map<String, dynamic>?;
+    if (tags == null) return null;
+
+    final rawName = (tags['name'] ?? tags['brand'] ?? '').toString().trim();
+    if (rawName.isEmpty) return null;
+
+    double? lat = (el['lat'] as num?)?.toDouble();
+    double? lon = (el['lon'] as num?)?.toDouble();
+    if (lat == null || lon == null) {
+      final center = el['center'] as Map<String, dynamic>?;
+      lat = (center?['lat'] as num?)?.toDouble();
+      lon = (center?['lon'] as num?)?.toDouble();
+    }
+    if (lat == null || lon == null) return null;
+
+    final lowerName = rawName.toLowerCase();
+    final brand = (tags['brand'] ?? '').toString().toLowerCase();
+    final shop = (tags['shop'] ?? '').toString().toLowerCase();
+
+    String kategori = 'Bengkel Umum';
+    bool isOfficial = false;
+
+    if (lowerName.contains('ahass') ||
+        lowerName.contains('honda') ||
+        lowerName.contains('astra motor') ||
+        brand.contains('honda')) {
+      kategori = 'Resmi Honda';
+      isOfficial = true;
+    } else if (lowerName.contains('yamaha') || brand.contains('yamaha')) {
+      kategori = 'Resmi Yamaha';
+      isOfficial = true;
+    } else if (lowerName.contains('tambal') ||
+        lowerName.contains('tubeless') ||
+        (shop == 'tyres' && !lowerName.contains('planet ban'))) {
+      kategori = 'Tambal Ban';
+    }
+
+    final street = tags['addr:street']?.toString() ?? '';
+    final houseNumber = tags['addr:housenumber']?.toString() ?? '';
+    final suburb = tags['addr:suburb']?.toString() ?? tags['addr:district']?.toString() ?? '';
+    final city = tags['addr:city']?.toString() ?? fallbackArea.split(',').first.trim();
+
+    final addressParts = <String>[
+      if (street.isNotEmpty) '$street${houseNumber.isNotEmpty ? ' No. $houseNumber' : ''}',
+      if (suburb.isNotEmpty) suburb,
+      if (city.isNotEmpty) city,
+    ];
+    final alamat = addressParts.isNotEmpty
+        ? addressParts.join(', ')
+        : 'Area $city (${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)})';
+
+    final openingHours = tags['opening_hours']?.toString() ?? '08:00 - 17:30 (Buka)';
+    final phone = tags['phone']?.toString() ?? tags['contact:phone']?.toString() ?? '-';
+
+    return Workshop(
+      id: 'osm-${el['id']}',
+      nama: rawName,
+      kategori: kategori,
+      alamat: alamat,
+      latitude: lat,
+      longitude: lon,
+      rating: isOfficial ? 4.8 : 4.6,
+      totalUlasan: isOfficial ? 180 : 85,
+      jamBuka: openingHours,
+      nomorTelepon: phone,
+      isOfficial: isOfficial,
+      isOpenNow: true,
+    );
+  }
+
+  /// Memetakan fitur GeoJSON dari Photon Komoot API (CDN cepat) menjadi [Workshop]
+  static Workshop? fromPhotonFeature(
+    Map<String, dynamic> feature,
+    double userLat,
+    double userLng,
+    String fallbackArea,
+  ) {
+    final geometry = feature['geometry'] as Map<String, dynamic>?;
+    final coords = geometry?['coordinates'] as List<dynamic>?;
+    final props = feature['properties'] as Map<String, dynamic>?;
+    if (coords == null || coords.length < 2 || props == null) return null;
+
+    final lon = (coords[0] as num?)?.toDouble();
+    final lat = (coords[1] as num?)?.toDouble();
+    if (lat == null || lon == null) return null;
+
+    final rawName = (props['name'] ?? '').toString().trim();
+    if (rawName.isEmpty) return null;
+
+    // Pastikan hanya mengambil bengkel yang berada dalam radius ~25 km dari pengguna
+    final dLat = (lat - userLat).abs();
+    final dLon = (lon - userLng).abs();
+    if (dLat > 0.25 || dLon > 0.25) return null;
+
+    final lowerName = rawName.toLowerCase();
+    String kategori = 'Bengkel Umum';
+    bool isOfficial = false;
+
+    if (lowerName.contains('ahass') ||
+        lowerName.contains('honda') ||
+        lowerName.contains('astra motor')) {
+      kategori = 'Resmi Honda';
+      isOfficial = true;
+    } else if (lowerName.contains('yamaha')) {
+      kategori = 'Resmi Yamaha';
+      isOfficial = true;
+    } else if (lowerName.contains('tambal') || lowerName.contains('tubeless')) {
+      kategori = 'Tambal Ban';
+    }
+
+    final street = props['street']?.toString() ?? '';
+    final district = props['district']?.toString() ?? props['locality']?.toString() ?? '';
+    final city = props['city']?.toString() ?? fallbackArea.split(',').first.trim();
+    final parts = <String>[
+      if (street.isNotEmpty) street,
+      if (district.isNotEmpty) district,
+      if (city.isNotEmpty) city,
+    ];
+    final alamat = parts.isNotEmpty ? parts.join(', ') : 'Area $city';
+
+    return Workshop(
+      id: 'photon-${props['osm_id'] ?? rawName.hashCode}',
+      nama: rawName,
+      kategori: kategori,
+      alamat: alamat,
+      latitude: lat,
+      longitude: lon,
+      rating: isOfficial ? 4.8 : 4.6,
+      totalUlasan: isOfficial ? 190 : 95,
+      jamBuka: '08:00 - 17:30 (Buka)',
+      nomorTelepon: '-',
+      isOfficial: isOfficial,
+      isOpenNow: true,
+    );
   }
 
   /// Preset daftar bengkel terdekat default

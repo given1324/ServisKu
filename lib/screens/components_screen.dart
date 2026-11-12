@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../models/service_component.dart';
 import '../models/service_history.dart';
 import '../providers/service_provider.dart';
+import '../utils/component_calculator.dart';
+import '../utils/validation.dart';
 import 'form_service_screen.dart';
 
 class ComponentsScreen extends ConsumerStatefulWidget {
@@ -62,7 +64,7 @@ Future<void> showAddComponentDialog(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama tidak boleh kosong' : null,
+                validator: FormValidation.validateNamaKomponen,
               ),
               const SizedBox(height: 14),
 
@@ -77,12 +79,7 @@ Future<void> showAddComponentDialog(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Interval wajib diisi';
-                  final n = int.tryParse(v.trim());
-                  if (n == null || n <= 0) return 'Masukkan angka km yang valid';
-                  return null;
-                },
+                validator: FormValidation.validateIntervalKm,
               ),
               const SizedBox(height: 14),
 
@@ -246,27 +243,15 @@ class _ComponentsScreenState extends ConsumerState<ComponentsScreen> {
 
               // List of components
               ...components.map((comp) {
-                // Cari servis terakhir yang sudah selesai untuk komponen ini
-                final relatedServices = historyList.where(
-                  (s) =>
-                      s.status == 'Selesai' &&
-                      s.jenisServis.toLowerCase().contains(comp.nama.toLowerCase()),
-                ).toList();
-
-                final int lastServicedKm = relatedServices.isNotEmpty
-                    ? relatedServices.first.odometer
-                    : 0;
-
-                final int nextServiceKm = lastServicedKm > 0
-                    ? (lastServicedKm + comp.intervalKm)
-                    : comp.intervalKm;
-
-                final int kmRemaining = nextServiceKm > currentOdo
-                    ? (nextServiceKm - currentOdo)
-                    : 0;
-
-                final bool isOverdue = currentOdo >= nextServiceKm && currentOdo > 0;
-                final bool isWarning = kmRemaining > 0 && kmRemaining <= 500;
+                final schedule = ComponentCalculator.evaluate(
+                  component: comp,
+                  historyList: historyList,
+                  currentOdo: currentOdo,
+                );
+                final int lastServicedKm = schedule.lastServicedKm;
+                final int kmRemaining = schedule.kmRemaining;
+                final bool isOverdue = schedule.isOverdue;
+                final bool isWarning = schedule.isWarning;
 
                 final Color statusColor = isOverdue
                     ? Colors.red

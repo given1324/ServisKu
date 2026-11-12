@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/service_history.dart';
 import '../providers/service_provider.dart';
+import '../utils/validation.dart';
 
 class FormServisScreen extends ConsumerStatefulWidget {
   final ServiceHistory? existingService;
@@ -165,6 +166,24 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
     }
   }
 
+  InputDecoration _buildFieldDecoration({String? hintText, String? prefixText}) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: TextStyle(color: Colors.grey.shade400),
+      prefixText: prefixText,
+      prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -217,20 +236,8 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _jenisServisController,
-                decoration: InputDecoration(
-                  hintText: 'Ganti Oli Mesin',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                ),
-                validator: (value) => (value == null || value.trim().isEmpty) ? 'Tidak boleh kosong' : null,
+                decoration: _buildFieldDecoration(hintText: 'Ganti Oli Mesin'),
+                validator: FormValidation.validateJenisServis,
               ),
               const SizedBox(height: 8),
               // Pilihan Cepat dari Komponen Servis
@@ -326,20 +333,8 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
                         TextFormField(
                           controller: _odometerController,
                           keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: '24560',
-                            hintStyle: TextStyle(color: Colors.grey.shade400),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade200),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade200),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          ),
-                          validator: (value) => (value == null || value.trim().isEmpty || int.tryParse(value) == null) ? 'Tidak valid' : null,
+                          decoration: _buildFieldDecoration(hintText: '24560'),
+                          validator: FormValidation.validateOdometer,
                         ),
                       ],
                     ),
@@ -355,22 +350,8 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
                 controller: _totalBiayaController,
                 keyboardType: TextInputType.number,
                 scrollPadding: const EdgeInsets.only(bottom: 140),
-                decoration: InputDecoration(
-                  prefixText: 'Rp  ',
-                  prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 14),
-                  hintText: '185000',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                ),
-                validator: (value) => (value == null || value.trim().isEmpty || int.tryParse(value) == null) ? 'Tidak valid' : null,
+                decoration: _buildFieldDecoration(hintText: '185000', prefixText: 'Rp  '),
+                validator: FormValidation.validateTotalBiaya,
               ),
               const SizedBox(height: 16),
               
@@ -392,19 +373,7 @@ class _FormServisScreenState extends ConsumerState<FormServisScreen> {
                 controller: _catatanController,
                 maxLines: 3,
                 scrollPadding: const EdgeInsets.only(bottom: 160),
-                decoration: InputDecoration(
-                  hintText: 'Oli Motul 10W-40',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                ),
+                decoration: _buildFieldDecoration(hintText: 'Oli Motul 10W-40'),
               ),
               const SizedBox(height: 16),
               

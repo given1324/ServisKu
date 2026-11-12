@@ -8,6 +8,9 @@ external void _getCurrentPosition(
   _PositionOptions options,
 );
 
+@JS('window.open')
+external JSObject? _windowOpen(String url, String target);
+
 extension type _GeolocationPosition._(JSObject _) implements JSObject {
   external _GeolocationCoordinates get coords;
 }
@@ -71,3 +74,12 @@ Future<({double lat, double lng})?> getBrowserGpsPosition() async {
   );
 }
 
+/// Membuka URL Google Maps secara langsung di tab baru browser
+Future<bool> openExternalMapUrl(String url) async {
+  try {
+    _windowOpen(url, '_blank');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}

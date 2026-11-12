@@ -1,10 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serviceku/models/service_component.dart';
 import 'package:serviceku/models/service_history.dart';
 import 'package:serviceku/models/vehicle_info.dart';
 import 'package:serviceku/providers/service_provider.dart';
+import 'package:serviceku/repositories/profile_repository.dart';
 import 'package:serviceku/repositories/service_repository.dart';
+import 'package:serviceku/utils/component_calculator.dart';
+import 'package:serviceku/utils/validation.dart';
 
 // Mock Repository
 class MockServiceRepository extends ServiceRepository {
@@ -236,6 +240,91 @@ void main() {
       await container.read(serviceComponentsProvider.notifier).deleteComponent('comp_busi');
       final state = container.read(serviceComponentsProvider).value;
       expect(state!.any((c) => c.id == 'comp_busi'), isFalse);
+    });
+  });
+
+  group('FormValidation Unit Tests (Pemisahan Tanggung Jawab Validasi)', () {
+    test('Validasi ProfileForm (nama motor, plat nomor, tahun)', () {
+      expect(FormValidation.validateNamaMotor(''), 'Nama motor tidak boleh kosong');
+      expect(FormValidation.validateNamaMotor('Honda Vario 160'), isNull);
+
+      expect(FormValidation.validatePlatNomor('   '), 'Plat nomor tidak boleh kosong');
+      expect(FormValidation.validatePlatNomor('KT 1234 AB'), isNull);
+
+      expect(FormValidation.validateTahun(''), 'Tahun tidak boleh kosong');
+      expect(FormValidation.validateTahun('1800'), 'Masukkan tahun yang valid (contoh: 2022)');
+      expect(FormValidation.validateTahun('2024'), isNull);
+    });
+
+    test('Validasi FormServis & Komponen', () {
+      expect(FormValidation.validateJenisServis(''), 'Tidak boleh kosong');
+      expect(FormValidation.validateJenisServis('Ganti Oli Mesin'), isNull);
+
+      expect(FormValidation.validateOdometer('abc'), 'Tidak valid');
+      expect(FormValidation.validateOdometer('12000'), isNull);
+
+      expect(FormValidation.validateTotalBiaya(''), 'Tidak valid');
+      expect(FormValidation.validateTotalBiaya('75000'), isNull);
+
+      expect(FormValidation.validateIntervalKm('0'), 'Masukkan angka km yang valid');
+      expect(FormValidation.validateIntervalKm('2000'), isNull);
+    });
+  });
+
+  group('ProfileRepository & ComponentCalculator Unit Tests', () {
+    test('ProfileRepository menyimpan dan memuat VehicleInfo dengan benar', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final profileRepo = ProfileRepository(prefs: prefs);
+
+      const newVehicle = VehicleInfo(
+        namaMotor: 'Honda PCX 160',
+        platNomor: 'KT 9999 ZZ',
+        tahun: 2025,
+      );
+
+      await profileRepo.saveVehicleInfo(newVehicle);
+      final loaded = await profileRepo.fetchVehicleInfo();
+
+      expect(loaded.namaMotor, 'Honda PCX 160');
+      expect(loaded.platNomor, 'KT 9999 ZZ');
+      expect(loaded.tahun, 2025);
+    });
+
+    test('ComponentCalculator menghitung jadwal servis tanpa duplikasi kode', () {
+      const comp = ServiceComponent(
+        id: 'comp_oli_mesin',
+        nama: 'Oli Mesin',
+        intervalKm: 2000,
+      );
+      final history = [
+        ServiceHistory(
+          id: 'h1',
+          jenisServis: 'Ganti Oli Mesin',
+          odometer: 10000,
+          totalBiaya: 60000,
+          createdAt: DateTime.now(),
+          status: 'Selesai',
+        ),
+      ];
+
+      final statusNormal = ComponentCalculator.evaluate(
+        component: comp,
+        historyList: history,
+        currentOdo: 11000,
+      );
+      expect(statusNormal.lastServicedKm, 10000);
+      expect(statusNormal.nextServiceKm, 12000);
+      expect(statusNormal.kmRemaining, 1000);
+      expect(statusNormal.isOverdue, isFalse);
+
+      final statusOverdue = ComponentCalculator.evaluate(
+        component: comp,
+        historyList: history,
+        currentOdo: 12500,
+      );
+      expect(statusOverdue.isOverdue, isTrue);
+      expect(statusOverdue.kmRemaining, 0);
     });
   });
 }
