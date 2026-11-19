@@ -734,7 +734,7 @@ class LocationState {
 }
 
 class LocationNotifier extends Notifier<LocationState> {
-  static const String locationStorageKey = 'servisku_user_location_v2';
+  static const String locationStorageKey = 'servisku_user_location_v4';
 
   @override
   LocationState build() {
@@ -752,29 +752,114 @@ class LocationNotifier extends Notifier<LocationState> {
     } catch (_) {}
   }
 
-  /// Mengubah koordinat GPS (lat, lng) menjadi nama Kota & Provinsi yang bersih via BigDataCloud API
+  /// Mengubah koordinat GPS (lat, lng) menjadi Nama Kecamatan/Area + Nama Jalan + Kota
+  /// Contoh hasil: "Legok, Jl. Raya Legok, Tangerang (GPS Aktif)"
   Future<String> _reverseGeocodeClean(double lat, double lng) async {
-    try {
-      final url = Uri.parse(
-        'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=$lat&longitude=$lng&localityLanguage=id',
-      );
-      final res = await http.get(url).timeout(const Duration(seconds: 6));
-      if (res.statusCode == 200) {
-        final data = json.decode(res.body) as Map<String, dynamic>;
-        final locality = data['locality']?.toString() ?? '';
-        final city = data['city']?.toString() ?? '';
-        final province = data['principalSubdivision']?.toString() ?? '';
+    String roadName = '';
+    String areaName = '';
+    String cityName = '';
 
-        final primary = city.isNotEmpty ? city : locality;
-        final parts = [primary, province]
-            .where((s) => s.trim().isNotEmpty)
-            .toSet()
-            .toList();
-        if (parts.isNotEmpty) {
-          return '${parts.join(', ')} (GPS Aktif)';
+    // 1. Ambil Nama Jalan & Kecamatan presisi dari Nominatim OpenStreetMap (zoom=18 untuk level jalan)
+    try {
+      final nomUrl = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1&accept-language=id',
+      );
+      final nomRes = await http.get(
+        nomUrl,
+        headers: {'User-Agent': 'ServisKuApp/1.0'},
+      ).timeout(const Duration(seconds: 4));
+
+      if (nomRes.statusCode == 200) {
+        final data = json.decode(nomRes.body) as Map<String, dynamic>;
+        final addr = data['address'] as Map<String, dynamic>?;
+        if (addr != null) {
+          roadName = (addr['road'] ??
+                  addr['pedestrian'] ??
+                  addr['residential'] ??
+                  addr['neighbourhood'] ??
+                  '')
+              .toString()
+              .trim();
+          areaName = (addr['municipality'] ??
+                  addr['city_district'] ??
+                  addr['suburb'] ??
+                  addr['village'] ??
+                  addr['town'] ??
+                  '')
+              .toString()
+              .trim();
+          cityName = (addr['city'] ??
+                  addr['regency'] ??
+                  addr['county'] ??
+                  addr['state'] ??
+                  '')
+              .toString()
+              .trim();
         }
       }
     } catch (_) {}
+
+    // 2. Jika nama jalan masih kosong, lengkapi dari Photon Komoot Reverse Geocode CDN
+    if (roadName.isEmpty || areaName.isEmpty) {
+      try {
+        final photonUrl = Uri.parse(
+          'https://photon.komoot.io/reverse?lat=$lat&lon=$lng',
+        );
+        final photonRes = await http.get(photonUrl).timeout(const Duration(seconds: 4));
+        if (photonRes.statusCode == 200) {
+          final data = json.decode(photonRes.body) as Map<String, dynamic>;
+          final features = data['features'] as List<dynamic>? ?? [];
+          if (features.isNotEmpty) {
+            final props = (features.first as Map<String, dynamic>)['properties'] as Map<String, dynamic>?;
+            if (props != null) {
+              if (roadName.isEmpty) {
+                roadName = (props['street'] ?? props['name'] ?? '').toString().trim();
+              }
+              if (areaName.isEmpty) {
+                areaName = (props['district'] ?? props['locality'] ?? '').toString().trim();
+              }
+              if (cityName.isEmpty) {
+                cityName = (props['city'] ?? props['county'] ?? props['state'] ?? '').toString().trim();
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback ke BigDataCloud jika Nominatim & Photon sedang offline
+    if (areaName.isEmpty && cityName.isEmpty) {
+      try {
+        final url = Uri.parse(
+          'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=$lat&longitude=$lng&localityLanguage=id',
+        );
+        final res = await http.get(url).timeout(const Duration(seconds: 5));
+        if (res.statusCode == 200) {
+          final data = json.decode(res.body) as Map<String, dynamic>;
+          areaName = (data['locality'] ?? '').toString().trim();
+          cityName = (data['city'] ?? data['principalSubdivision'] ?? '').toString().trim();
+          if (cityName.toLowerCase() == 'jawa') {
+            cityName = 'Tangerang, Banten';
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Susun format: "Legok, Jl. Nama Jalan, Kota"
+    final parts = <String>[];
+    if (areaName.isNotEmpty) parts.add(areaName);
+    if (roadName.isNotEmpty && roadName.toLowerCase() != areaName.toLowerCase()) {
+      parts.add(roadName);
+    }
+    if (cityName.isNotEmpty &&
+        cityName.toLowerCase() != areaName.toLowerCase() &&
+        cityName.toLowerCase() != 'jawa') {
+      parts.add(cityName);
+    }
+
+    if (parts.isNotEmpty) {
+      return '${parts.join(', ')} (GPS Aktif)';
+    }
     return 'Titik GPS (${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)})';
   }
 
@@ -796,7 +881,6 @@ class LocationNotifier extends Notifier<LocationState> {
               longitude: lng,
               locationName: name,
             );
-            return;
           }
         }
       } catch (_) {}
