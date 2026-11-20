@@ -7,6 +7,7 @@ import 'package:serviceku/models/vehicle_info.dart';
 import 'package:serviceku/providers/service_provider.dart';
 import 'package:serviceku/repositories/profile_repository.dart';
 import 'package:serviceku/repositories/service_repository.dart';
+import 'package:serviceku/utils/app_logger.dart';
 import 'package:serviceku/utils/component_calculator.dart';
 import 'package:serviceku/utils/validation.dart';
 
@@ -325,6 +326,21 @@ void main() {
       );
       expect(statusOverdue.isOverdue, isTrue);
       expect(statusOverdue.kmRemaining, 0);
+    });
+
+    test('AppLogger mencatat dan menyimpan log runtime untuk tracing masalah', () async {
+      SharedPreferences.setMockInitialValues({});
+      await AppLogger.clear();
+
+      AppLogger.info('STARTUP', 'Aplikasi dimulai');
+      AppLogger.success('GPS', 'Lokasi terdeteksi: Legok, Jl. Raya Legok, Tangerang');
+      AppLogger.warning('SUPABASE', 'Koneksi lambat, menggunakan cache lokal');
+      AppLogger.error('API', 'Timeout menghubungi endpoint', error: 'TimeoutException');
+
+      expect(AppLogger.entries.length, 4);
+      expect(AppLogger.entries.first.level, LogLevel.error);
+      expect(AppLogger.entries.first.tag, 'API');
+      expect(AppLogger.entries.first.detail, contains('TimeoutException'));
     });
   });
 }

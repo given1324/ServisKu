@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/service_history.dart';
@@ -7,6 +6,7 @@ import '../models/service_component.dart';
 import '../models/vehicle_info.dart';
 import '../services/api_service.dart';
 import '../services/supabase_service.dart';
+import '../utils/app_logger.dart';
 import 'profile_repository.dart';
 
 class ServiceRepository {
@@ -39,8 +39,8 @@ class ServiceRepository {
   // ===========================================================================
 
   /// Memuat daftar riwayat servis dari Supabase PostgreSQL, REST API, atau cache lokal
-  Future<List<ServiceHistory>> fetchServiceHistory([String? userEmail]) async {
-    final cloudList = await _fetchHistoryFromCloud(userEmail);
+  Future<List<ServiceHistory>> fetchServiceHistory() async {
+    final cloudList = await _fetchHistoryFromCloud();
     if (cloudList != null) {
       final p = await _getPrefs();
       await _saveList(p, cloudList);
@@ -61,8 +61,8 @@ class ServiceRepository {
   }
 
   /// Menambahkan riwayat servis baru ke Supabase PostgreSQL, REST API, & cache lokal
-  Future<void> addServiceHistory(ServiceHistory service, [String? userEmail]) async {
-    await _upsertHistoryToCloud(service, userEmail);
+  Future<void> addServiceHistory(ServiceHistory service) async {
+    await _upsertHistoryToCloud(service);
 
     if (apiService != null) {
       await apiService!.createService(service);
@@ -77,7 +77,7 @@ class ServiceRepository {
   }
 
   /// Memperbarui riwayat servis di Supabase PostgreSQL, REST API, & cache lokal
-  Future<void> updateServiceHistory(ServiceHistory service, [String? userEmail]) async {
+  Future<void> updateServiceHistory(ServiceHistory service) async {
     await _updateHistoryInCloud(service);
 
     if (apiService != null) {
@@ -123,10 +123,10 @@ class ServiceRepository {
       final list = (response as List)
           .map((item) => _mapCloudRowToServiceHistory(Map<String, dynamic>.from(item)))
           .toList();
-      debugPrint('✅ [Supabase] Berhasil memuat ${list.length} riwayat servis dari cloud');
+      AppLogger.success('SERVICE_REPO', 'Berhasil memuat ${list.length} riwayat servis dari Supabase cloud');
       return list;
     } catch (e) {
-      debugPrint('⚠️ [Supabase] Gagal memuat dari Supabase, menggunakan cache lokal: $e');
+      AppLogger.warning('SERVICE_REPO', 'Gagal memuat dari Supabase, menggunakan cache lokal', error: e);
       return null;
     }
   }
@@ -149,9 +149,9 @@ class ServiceRepository {
         payload['user_id'] = _currentUserId!;
       }
       await _supabase!.from('service_history').upsert(payload);
-      debugPrint('✅ [Supabase] Riwayat servis ${service.jenisServis} tersimpan di cloud');
+      AppLogger.success('SERVICE_REPO', 'Riwayat servis "${service.jenisServis}" (${service.odometer} km) tersimpan di cloud');
     } catch (e) {
-      debugPrint('⚠️ [Supabase] Gagal menyimpan riwayat ke cloud: $e');
+      AppLogger.warning('SERVICE_REPO', 'Gagal menyimpan riwayat servis ke cloud', error: e);
     }
   }
 
@@ -165,9 +165,9 @@ class ServiceRepository {
         'status': service.status,
         'catatan': service.catatan,
       }).eq('id', service.id);
-      debugPrint('✅ [Supabase] Riwayat servis ID ${service.id} berhasil diperbarui di cloud');
+      AppLogger.success('SERVICE_REPO', 'Riwayat servis ID ${service.id} diperbarui (status: ${service.status})');
     } catch (e) {
-      debugPrint('⚠️ [Supabase] Gagal update riwayat di cloud: $e');
+      AppLogger.warning('SERVICE_REPO', 'Gagal update riwayat servis ID ${service.id} di cloud', error: e);
     }
   }
 
@@ -175,9 +175,9 @@ class ServiceRepository {
     if (_supabase == null) return;
     try {
       await _supabase!.from('service_history').delete().eq('id', id);
-      debugPrint('✅ [Supabase] Riwayat ID $id berhasil dihapus dari cloud');
+      AppLogger.success('SERVICE_REPO', 'Riwayat servis ID $id dihapus dari cloud');
     } catch (e) {
-      debugPrint('⚠️ [Supabase] Gagal menghapus riwayat dari cloud: $e');
+      AppLogger.warning('SERVICE_REPO', 'Gagal menghapus riwayat ID $id dari cloud', error: e);
     }
   }
 
@@ -225,13 +225,13 @@ class ServiceRepository {
   // ===========================================================================
 
   /// Memuat info motor melalui [ProfileRepository] (menghindari duplikasi kode)
-  Future<VehicleInfo> fetchVehicleInfo([String? userEmail]) {
-    return _profileRepository.fetchVehicleInfo(userEmail);
+  Future<VehicleInfo> fetchVehicleInfo() {
+    return _profileRepository.fetchVehicleInfo();
   }
 
   /// Menyimpan info motor melalui [ProfileRepository] (menghindari duplikasi kode)
-  Future<void> saveVehicleInfo(VehicleInfo info, [String? userEmail]) {
-    return _profileRepository.saveVehicleInfo(info, userEmail);
+  Future<void> saveVehicleInfo(VehicleInfo info) {
+    return _profileRepository.saveVehicleInfo(info);
   }
 
   // ===========================================================================
@@ -239,8 +239,8 @@ class ServiceRepository {
   // ===========================================================================
 
   /// Memuat komponen servis dari Supabase PostgreSQL atau cache lokal
-  Future<List<ServiceComponent>> fetchComponents([String? userEmail]) async {
-    final cloudComponents = await _fetchComponentsFromCloud(userEmail);
+  Future<List<ServiceComponent>> fetchComponents() async {
+    final cloudComponents = await _fetchComponentsFromCloud();
     if (cloudComponents != null && cloudComponents.isNotEmpty) {
       return cloudComponents;
     }
@@ -250,22 +250,22 @@ class ServiceRepository {
   }
 
   /// Tambah komponen servis ke Supabase & cache lokal
-  Future<void> addComponent(ServiceComponent component, [String? userEmail]) async {
-    await _upsertComponentToCloud(component, userEmail);
+  Future<void> addComponent(ServiceComponent component) async {
+    await _upsertComponentToCloud(component);
 
     final p = await _getPrefs();
-    final currentList = await fetchComponents(userEmail);
+    final currentList = await fetchComponents();
     currentList.removeWhere((item) => item.id == component.id);
     currentList.add(component);
     await _saveComponentsToLocal(p, currentList);
   }
 
   /// Update komponen servis di Supabase & cache lokal
-  Future<void> updateComponent(ServiceComponent component, [String? userEmail]) async {
+  Future<void> updateComponent(ServiceComponent component) async {
     await _updateComponentInCloud(component);
 
     final p = await _getPrefs();
-    final currentList = await fetchComponents(userEmail);
+    final currentList = await fetchComponents();
     final index = currentList.indexWhere((item) => item.id == component.id);
     if (index != -1) {
       currentList[index] = component;
@@ -306,7 +306,7 @@ class ServiceRepository {
         }).toList();
       }
     } catch (e) {
-      debugPrint('⚠️ [Supabase] Gagal memuat komponen dari cloud: $e');
+      AppLogger.warning('COMPONENT_REPO', 'Gagal memuat komponen dari cloud', error: e);
     }
     return null;
   }
@@ -327,9 +327,9 @@ class ServiceRepository {
         payload['user_id'] = _currentUserId!;
       }
       await _supabase!.from('service_components').upsert(payload);
-      debugPrint('✅ [Supabase] Komponen ${component.nama} tersimpan di cloud');
+      AppLogger.success('COMPONENT_REPO', 'Komponen "${component.nama}" (${component.intervalKm} km) tersimpan di cloud');
     } catch (e) {
-      debugPrint('⚠️ [Supabase] Gagal tambah komponen di cloud: $e');
+      AppLogger.warning('COMPONENT_REPO', 'Gagal tambah komponen di cloud', error: e);
     }
   }
 
@@ -341,9 +341,9 @@ class ServiceRepository {
         'interval_km': component.intervalKm,
         'deskripsi': component.deskripsi,
       }).eq('id', component.id);
-      debugPrint('✅ [Supabase] Komponen ${component.nama} diupdate di cloud');
+      AppLogger.success('COMPONENT_REPO', 'Komponen "${component.nama}" diupdate di cloud');
     } catch (e) {
-      debugPrint('⚠️ [Supabase] Gagal update komponen di cloud: $e');
+      AppLogger.warning('COMPONENT_REPO', 'Gagal update komponen di cloud', error: e);
     }
   }
 
@@ -351,9 +351,9 @@ class ServiceRepository {
     if (_supabase == null) return;
     try {
       await _supabase!.from('service_components').delete().eq('id', id);
-      debugPrint('✅ [Supabase] Komponen ID $id dihapus dari cloud');
+      AppLogger.success('COMPONENT_REPO', 'Komponen ID $id dihapus dari cloud');
     } catch (e) {
-      debugPrint('⚠️ [Supabase] Gagal hapus komponen di cloud: $e');
+      AppLogger.warning('COMPONENT_REPO', 'Gagal hapus komponen di cloud', error: e);
     }
   }
 

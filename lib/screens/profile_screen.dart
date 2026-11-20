@@ -5,6 +5,7 @@ import '../models/vehicle_info.dart';
 import '../providers/service_provider.dart';
 import 'form_motor_screen.dart';
 import 'login_screen.dart';
+import 'system_log_screen.dart';
 
 
 /// Layar Profil Pengguna & Manajemen Sesi (MVP Advance Feature 1)
@@ -247,6 +248,28 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
+
+                // Tombol Pemantau Log Sistem (Runtime Tracing)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: accentColor,
+                    side: const BorderSide(color: accentColor),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.terminal_rounded),
+                  label: const Text(
+                    'Log Sistem (Tracing Runtime)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SystemLogScreen()),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
 
                 // Tombol Keluar (Logout)
                 OutlinedButton.icon(

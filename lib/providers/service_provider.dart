@@ -15,6 +15,7 @@ import '../repositories/service_repository.dart';
 import '../services/api_service.dart';
 import '../services/gps_helper.dart';
 import '../services/supabase_service.dart';
+import '../utils/app_logger.dart';
 import '../utils/component_calculator.dart';
 
 // Provider untuk instance SharedPreferences opsional (dapat di-override di main/test)
@@ -329,11 +330,12 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
           final prefs = ref.watch(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
           await prefs.setString(authStorageKey, user.toJson());
           await _syncLocalRegisteredUser(prefs, user, trimmedPassword);
+          AppLogger.success('AUTH', 'Login Supabase berhasil untuk akun: $trimmedEmail');
           state = AsyncValue.data(user);
           return;
         }
       } on AuthException catch (e) {
-        debugPrint('⚠️ [Supabase Auth] AuthException: ${e.message} (code: ${e.code})');
+        AppLogger.warning('AUTH', 'Supabase AuthException saat login ($trimmedEmail): ${e.message} (code: ${e.code})');
         final msgLower = e.message.toLowerCase();
         // Supabase hanya mengembalikan 'Email not confirmed' jika email & password VALID
         // namun fitur Confirm Email di dashboard Supabase masih aktif dan belum diklik.
@@ -543,7 +545,10 @@ class NotificationNotifier extends AsyncNotifier<List<ServiceNotification>> {
 
   @override
   Future<List<ServiceNotification>> build() async {
-    final prefs = ref.watch(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
+    final prefs = ref.watch(sharedPreferencesProvider);
+    if (prefs == null) {
+      return [];
+    }
     final jsonStr = prefs.getString(storageKey);
     if (jsonStr != null && jsonStr.isNotEmpty) {
       try {
@@ -683,12 +688,13 @@ class NotificationNotifier extends AsyncNotifier<List<ServiceNotification>> {
 
   Future<void> clearAll() async {
     state = const AsyncValue.data([]);
-    final prefs = ref.watch(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
-    await prefs.remove(storageKey);
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs?.remove(storageKey);
   }
 
   Future<void> _persist(List<ServiceNotification> list) async {
-    final prefs = ref.watch(sharedPreferencesProvider) ?? await SharedPreferences.getInstance();
+    final prefs = ref.read(sharedPreferencesProvider);
+    if (prefs == null) return;
     final jsonList = list.map((e) => e.toMap()).toList();
     await prefs.setString(storageKey, json.encode(jsonList));
   }
@@ -887,9 +893,14 @@ class LocationNotifier extends Notifier<LocationState> {
     }
 
     // Ambil koordinat GPS asli dari perangkat/browser (navigator.geolocation)
+    AppLogger.info('GPS', 'Meminta pembacaan sensor GPS perangkat...');
     final gpsPos = await getBrowserGpsPosition();
     if (gpsPos != null) {
       final cleanName = await _reverseGeocodeClean(gpsPos.lat, gpsPos.lng);
+      AppLogger.success(
+        'GPS',
+        'Lokasi GPS terkunci: $cleanName (${gpsPos.lat.toStringAsFixed(5)}, ${gpsPos.lng.toStringAsFixed(5)})',
+      );
       state = LocationState(
         permission: LocationPermissionState.granted,
         latitude: gpsPos.lat,
@@ -899,6 +910,8 @@ class LocationNotifier extends Notifier<LocationState> {
       await _saveLocation(gpsPos.lat, gpsPos.lng, cleanName);
       return;
     }
+
+    AppLogger.warning('GPS', 'Sensor GPS belum mengembalikan koordinat baru, menggunakan lokasi aktif: ${state.locationName}');
 
     // Jika GPS browser belum diizinkan, gunakan lokasi tersimpan atau default yang bersih
     state = LocationState(

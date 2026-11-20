@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,13 +6,38 @@ import 'providers/service_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation_screen.dart';
 import 'services/supabase_service.dart';
+import 'utils/app_logger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
 
+  // Inisialisasi sistem Log Runtime untuk tracing masalah saat aplikasi berjalan
+  await AppLogger.init(prefs);
+
+  // Pasang penangkap error global (Flutter UI & Asynchronous Platform Errors)
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    AppLogger.error(
+      'FLUTTER_UI',
+      'Unhandled Flutter framework exception: ${details.exceptionAsString()}',
+      stackTrace: details.stack,
+    );
+  };
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    AppLogger.error(
+      'RUNTIME',
+      'Unhandled asynchronous runtime error',
+      error: error,
+      stackTrace: stack,
+    );
+    return true;
+  };
+
   // Inisialisasi koneksi ke Database Supabase PostgreSQL
+  AppLogger.info('STARTUP', 'Menginisialisasi koneksi Supabase PostgreSQL...');
   await SupabaseService.initialize();
+  AppLogger.success('STARTUP', 'Aplikasi ServisKu siap dijalankan (Running Mode)');
 
   runApp(
     // Membungkus aplikasi dengan ProviderScope dan menyuntikkan SharedPreferences yang sudah siap

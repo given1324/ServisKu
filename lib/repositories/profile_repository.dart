@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/vehicle_info.dart';
 import '../services/supabase_service.dart';
+import '../utils/app_logger.dart';
 
 /// Repository khusus untuk mengelola request API (Supabase Cloud) dan
 /// penyimpanan lokal profil kendaraan (VehicleInfo).
@@ -25,8 +25,8 @@ class ProfileRepository {
   }
 
   /// Memuat profil kendaraan dari Cloud API (Supabase) dengan fallback ke cache lokal.
-  Future<VehicleInfo> fetchVehicleInfo([String? userEmail]) async {
-    final cloudVehicle = await _fetchVehicleFromCloud(userEmail);
+  Future<VehicleInfo> fetchVehicleInfo() async {
+    final cloudVehicle = await _fetchVehicleFromCloud();
     if (cloudVehicle != null) {
       await _saveVehicleToLocal(cloudVehicle);
       return cloudVehicle;
@@ -35,8 +35,8 @@ class ProfileRepository {
   }
 
   /// Menyimpan profil kendaraan ke Cloud API (Supabase) dan cache lokal.
-  Future<void> saveVehicleInfo(VehicleInfo info, [String? userEmail]) async {
-    await _saveVehicleToCloud(info, userEmail);
+  Future<void> saveVehicleInfo(VehicleInfo info) async {
+    await _saveVehicleToCloud(info);
     await _saveVehicleToLocal(info);
   }
 
@@ -56,10 +56,12 @@ class ProfileRepository {
       }
       final response = await query.limit(1);
       if (response.isNotEmpty) {
-        return mapCloudRowToVehicle(Map<String, dynamic>.from(response.first));
+        final v = mapCloudRowToVehicle(Map<String, dynamic>.from(response.first));
+        AppLogger.success('PROFILE_REPO', 'Berhasil memuat profil motor dari cloud: ${v.namaMotor}');
+        return v;
       }
     } catch (e) {
-      debugPrint('⚠️ [Supabase] Gagal memuat info motor dari cloud: $e');
+      AppLogger.warning('PROFILE_REPO', 'Gagal memuat info motor dari cloud, beralih ke lokal', error: e);
     }
     return null;
   }
@@ -76,9 +78,9 @@ class ProfileRepository {
         userId: _currentUserId,
       );
       await _supabase!.from('vehicle_info').upsert(payload);
-      debugPrint('✅ [Supabase] Info motor tersimpan di cloud');
+      AppLogger.success('PROFILE_REPO', 'Info motor (${info.namaMotor} - ${info.platNomor}) tersimpan di cloud');
     } catch (e) {
-      debugPrint('⚠️ [Supabase] Gagal menyimpan info motor ke cloud: $e');
+      AppLogger.warning('PROFILE_REPO', 'Gagal menyimpan info motor ke cloud', error: e);
     }
   }
 
