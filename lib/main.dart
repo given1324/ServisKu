@@ -94,7 +94,7 @@ class MyApp extends ConsumerWidget {
             ),
           ),
         ),
-        error: (_, __) => const LoginScreen(),
+        error: (_, _) => const LoginScreen(),
         data: (user) {
           // Jika akun benar-benar sudah login, otomatis masuk ke dashboard
           if (user != null) {
