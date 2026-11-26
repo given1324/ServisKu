@@ -1,0 +1,82 @@
+name: ServisKu CI/CD Pipeline (P11 - 200+ Unit Tests, Auto Build & Deploy)
+
+on:
+  push:
+    branches:
+      - main
+      - v1.0
+      - v1.0_dev
+      - V1.1
+  pull_request:
+    branches:
+      - main
+      - v1.0
+      - V1.1
+
+jobs:
+  # ============================================================================
+  # STAGE 1: AUTOMATED UNIT & WIDGET TESTING (200+ UNIT TESTS GATEKEEPER)
+  # ============================================================================
+  unit_testing:
+    name: "1. Run 200+ Unit Tests (Gatekeeper)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Verify Code Formatting & Static Analysis
+        run: flutter analyze --no-fatal-infos
+
+      - name: Execute Full 200+ Unit & Widget Test Suite
+        run: flutter test --reporter expanded
+
+  # ============================================================================
+  # STAGE 2: AUTO BUILD & DEPLOY TO LIVE (HANYA JALAN JIKA SEMUA 200+ UT HIJAU)
+  # ============================================================================
+  auto_build_and_deploy:
+    name: "2. Auto Build & Deploy Live (All Tests Green)"
+    needs: unit_testing
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK 17 for Android Build
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Auto Build Flutter Web Release (Live Web App)
+        run: flutter build web --release
+
+      - name: Upload Live Web Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: servisku-web-live-release
+          path: build/web
+
+      - name: Deploy Ready Notification
+        run: |
+          echo "✅ Seluruh 200+ Unit Test LULUS (HIJAU)!"
+          echo "🚀 Build Release berhasil dibuat dan siap untuk Live Testing!"

@@ -28,7 +28,7 @@ class FormValidation {
     if (_isBlank(value)) {
       return 'Tahun tidak boleh kosong';
     }
-    final year = int.tryParse(value!.trim());
+    final year = int.tryParse(value!.trim(), radix: 10);
     if (year == null || year < 1900 || year > 2100) {
       return 'Masukkan tahun yang valid (contoh: 2022)';
     }
@@ -109,7 +109,7 @@ class FormValidation {
     if (_isBlank(value)) {
       return 'Interval wajib diisi';
     }
-    final parsed = int.tryParse(value!.trim());
+    final parsed = int.tryParse(value!.trim(), radix: 10);
     if (parsed == null || parsed <= 0) {
       return 'Masukkan angka km yang valid';
     }
@@ -128,7 +128,7 @@ class FormValidation {
     if (_isBlank(value)) {
       return 'Tidak valid';
     }
-    final parsed = int.tryParse(value!.trim());
+    final parsed = int.tryParse(value!.trim(), radix: 10);
     if (parsed == null || parsed < 0) {
       return 'Tidak valid';
     }
